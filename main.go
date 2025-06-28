@@ -30,7 +30,8 @@ func main() {
 	}
 	fmt.Printf("Zarlar: %d, %d\n", d1, d2)
 
-	stones, moved := core.MoveStoneAndUpdate(stones, 0, 11, 1)
+	//stones, moved := core.MoveStoneAndUpdate(stones, 0, 11, 1)
+	stones, moved := core.MoveTopStoneAndUpdate(stones, 1, 0, 11)
 	core.SortStonesByPlayerPointAndStackDesc(stones)
 	if moved {
 		fmt.Println("Taş başarıyla hareket etti.")

@@ -85,7 +85,35 @@ func SortStonesByPlayerPointAndStackAsc(stones []*LogicalCoordinate) {
 
 // Taşı hedef noktaya taşır ve MoveOrder günceller.
 // Sadece taşın eski ve yeni noktalarındaki taşlar güncellenir.
-func MoveStoneAndUpdate(stones []*LogicalCoordinate, index int, newPointIndex int, player int) ([]*LogicalCoordinate, bool) {
+func MoveTopStoneAndUpdate(stones []*LogicalCoordinate, player int, fromPointIndex int, toPointIndex int) ([]*LogicalCoordinate, bool) {
+	var moveIndex int = -1
+	// fromPointIndex'teki en üstteki ve player'a ait taşı bul
+	for i, stone := range stones {
+		if stone.PointIndex == fromPointIndex && stone.IsTop && stone.Player == player {
+			moveIndex = i
+			break
+		}
+	}
+
+	if moveIndex == -1 {
+		// Taş bulunamadı, hareket yapılmadı
+		return stones, false
+	}
+
+	oldPointIndex := stones[moveIndex].PointIndex
+	stones[moveIndex].PointIndex = toPointIndex
+	stones[moveIndex].PositionType = PositionTypeEnum.Point
+
+	globalMoveOrder++
+	stones[moveIndex].MoveOrder = globalMoveOrder
+
+	// Güncellemeleri yap
+	stones = UpdateStacks(stones, []int{oldPointIndex, toPointIndex})
+
+	return stones, true
+}
+
+/*func MoveStoneAndUpdate(stones []*LogicalCoordinate, index int, newPointIndex int, player int) ([]*LogicalCoordinate, bool) {
 
 	// Taşın belirtilen oyuncuya ait olup olmadığını kontrol et
 	if stones[index].Player != player {
@@ -106,7 +134,7 @@ func MoveStoneAndUpdate(stones []*LogicalCoordinate, index int, newPointIndex in
 	stones[index].MoveOrder = globalMoveOrder
 
 	return UpdateStacks(stones, []int{oldPointIndex, newPointIndex}), true
-}
+}*/
 
 // Sadece verilen noktaların taşlarını günceller
 func UpdateStacks(stones []*LogicalCoordinate, pointsToUpdate []int) []*LogicalCoordinate {
