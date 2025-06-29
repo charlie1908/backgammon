@@ -87,7 +87,21 @@ func SortStonesByPlayerPointAndStackAsc(stones []*LogicalCoordinate) {
 // Taşı hedef noktaya taşır ve MoveOrder günceller.
 // Sadece taşın eski ve yeni noktalarındaki taşlar güncellenir.
 func MoveTopStoneAndUpdate(stones []*LogicalCoordinate, player int, fromPointIndex int, toPointIndex int) ([]*LogicalCoordinate, bool) {
+
+	//Normalde IsBarEntryAllowed(), IsNormalMoveAllowed() functionlari bu Methodun basinda cagrilip bakilmali. Ama gene de bir ekstra 3 kontrol koyma ihtiyaci duydum.
+
+	// 1. Gecerli oyuncun belirtilen yerde en ustte tasi var mi ?
+	if !PlayerHasTopStoneAt(stones, player, fromPointIndex) {
+		return stones, false // Oyuncunun bu noktada üstte taşı yok, hareket edemez
+	}
+
+	// 2. Hedef nokta geçerli mi?
+	if toPointIndex < 0 || toPointIndex >= 24 {
+		return stones, false
+	}
+
 	//Karsi rakibin birden fazla tasi var mi ? ilgili PointIndex'inde..
+	// 3. Hedef nokta rakip tarafindan blokaj altinda mi ?
 	if !CanMoveToPoint(stones, player, toPointIndex) {
 		return stones, false // Hareket yasak
 	}
@@ -130,10 +144,20 @@ func MoveTopStoneAndUpdate(stones []*LogicalCoordinate, player int, fromPointInd
 	globalMoveOrder++
 	stones[moveIndex].MoveOrder = globalMoveOrder
 
-	// Güncellemeleri yap
+	// StackIndex Güncellemelerini yap
 	stones = UpdateStacks(stones, []int{oldPointIndex, toPointIndex})
 
 	return stones, true
+}
+
+// Oynayacak Player'in belirtiln from noktasindaki taş dilimlerinde en üstte taşa sahip olup olmadığını kontrol eder.
+func PlayerHasTopStoneAt(stones []*LogicalCoordinate, player int, pointIndex int) bool {
+	for _, stone := range stones {
+		if stone.Player == player && stone.PointIndex == pointIndex && stone.IsTop {
+			return true
+		}
+	}
+	return false
 }
 
 func CanMoveToPoint(stones []*LogicalCoordinate, player int, toPointIndex int) bool {

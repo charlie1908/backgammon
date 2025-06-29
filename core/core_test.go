@@ -11,22 +11,34 @@ func TestMoveTopStoneAndUpdate_ValidMove_WithConsoleOutput(t *testing.T) {
 	stones := core.GetInitialStones()
 
 	player := 1
-	fromPoint := 0
-	toPoint := 1 // Geçerli nokta, rakip az ya da yok
+	fromPoint := 0      // Player 1 hareket etmek istediği yer
+	toPoint := 3        // Hedef nokta (Geceli acik)
+	dice := []int{1, 2} // Zarlar
+
+	//Once kirik tasi var mi kontrolu
+	result := core.IsBarEntryAllowed(stones, player, dice)
+
+	if result.FromBar {
+		t.Error("Bar'da taş var gozukuyor ama yok, FromBar false olmalı")
+	}
+	//Kirik tasi yok. Normal hareket kontrolu
+	result = core.IsNormalMoveAllowed(stones, player, fromPoint, toPoint, dice)
+	if !result.Allowed {
+		t.Fatalf("Normal hareket izin verilmedi ama verilmesi bekleniyordu: %d -> %d", fromPoint, toPoint)
+	}
 
 	updatedStones, moved := core.MoveTopStoneAndUpdate(stones, player, fromPoint, toPoint)
 	if !moved {
 		t.Errorf("Taş hareket etmedi ama hareket mümkün olmalıydı.")
 	}
 
-	if moved {
-		t.Logf("Taş başarıyla hareket etti: Player %d, %d -> %d", player, fromPoint, toPoint)
-		core.SortStonesByPlayerPointAndStackDesc(updatedStones)
-		t.Log("Taşların Son Durumu:")
-		for _, stone := range updatedStones {
-			t.Logf("PointIndex: %d, Player: %d, StackIndex: %d, IsTop: %v, MoveOrder: %d",
-				stone.PointIndex, stone.Player, stone.StackIndex, stone.IsTop, stone.MoveOrder)
-		}
+	t.Logf("Taş başarıyla hareket etti: Player %d, %d -> %d", player, fromPoint, toPoint)
+
+	core.SortStonesByPlayerPointAndStackDesc(updatedStones)
+	t.Log("Taşların Son Durumu:")
+	for _, stone := range updatedStones {
+		t.Logf("PointIndex: %d, Player: %d, StackIndex: %d, IsTop: %v, MoveOrder: %d",
+			stone.PointIndex, stone.Player, stone.StackIndex, stone.IsTop, stone.MoveOrder)
 	}
 }
 
@@ -35,11 +47,31 @@ func TestMoveTopStoneAndUpdate_InvalidMove(t *testing.T) {
 
 	player := 1
 	fromPoint := 0
-	toPoint := 5 // Burada oyuncu 2'nin 5 taşı var, geçersiz hareket
+	toPoint := 5        // Burada Player2'nin 5'de, 5 taşı var, geçersiz hareket.
+	dice := []int{1, 4} // Zarlar
 
+	//Once kirik tasi var mi kontrolu
+	result := core.IsBarEntryAllowed(stones, player, dice)
+
+	if result.FromBar {
+		t.Error("Bar'da taş var gozukuyor ama yok, FromBar false olmalı")
+	}
+	//Kirik tasi yok. Normal hareket kontrolu. Ama hareket edememesi lazim..
+	result = core.IsNormalMoveAllowed(stones, player, fromPoint, toPoint, dice)
+	if result.Allowed {
+		t.Fatalf("Normal hareket izin verilmemeli idi ama izin verildi: %d -> %d", fromPoint, toPoint)
+	}
+
+	// Geçersiz hamle olduğundan MoveTopStoneAndUpdate çağrılmamalı
+	// Bu satıra kadar gelindiyse test başarılıdır
+	t.Logf("Geçersiz hareket 'IsNormalMoveAllowed()' ile doğru şekilde engellendi: Player %d, %d -> %d", player, fromPoint, toPoint)
+
+	//Burada moved zaten false gelmeli. Bakalim 2. kontrol calisiyor mu ?
 	updatedStones, moved := core.MoveTopStoneAndUpdate(stones, player, fromPoint, toPoint)
 	if moved {
 		t.Errorf("Taş hareket etti ama hareket yasak olmalıydı.")
+	} else {
+		t.Log("MoveTopStoneAndUpdate() icindeki kontroller calisti ve hareket doğru şekilde engellendi")
 	}
 
 	// Taşın konumu değişmemeli
@@ -47,6 +79,111 @@ func TestMoveTopStoneAndUpdate_InvalidMove(t *testing.T) {
 		if s.Player == player && s.PointIndex == toPoint {
 			t.Errorf("Taş yanlışlıkla rakip taşların olduğu noktaya taşındı.")
 		}
+	}
+}
+
+func TestMoveTopStoneAndUpdate_CaptureOpponentStoneAndSendToBar(t *testing.T) {
+	stones := []*core.LogicalCoordinate{
+		// Player 1’in Point 3’teki tek taşı (kırılacak)
+		{
+			Player:       1,
+			PointIndex:   3,
+			PositionType: core.PositionTypeEnum.Point,
+			StackIndex:   0,
+			IsTop:        true,
+			MoveOrder:    0,
+		},
+		// Player 2’nin Point 7’deki taşı (hareket edecek)
+		{
+			Player:       2,
+			PointIndex:   7,
+			PositionType: core.PositionTypeEnum.Point,
+			StackIndex:   2,
+			IsTop:        true,
+			MoveOrder:    0,
+		},
+		{
+			Player:       2,
+			PointIndex:   7,
+			PositionType: core.PositionTypeEnum.Point,
+			StackIndex:   1,
+			IsTop:        false,
+			MoveOrder:    0,
+		},
+		{
+			Player:       2,
+			PointIndex:   7,
+			PositionType: core.PositionTypeEnum.Point,
+			StackIndex:   0,
+			IsTop:        false,
+			MoveOrder:    0,
+		},
+	}
+
+	player := 2
+	fromPoint := 7
+	toPoint := 3
+	dice := []int{4, 2}
+
+	//Before
+	t.Log("BEFORE")
+	core.SortStonesByPlayerPointAndStackDesc(stones)
+	t.Log("Taşların Son Durumu:")
+	for _, stone := range stones {
+		t.Logf("PointIndex: %d, Player: %d, StackIndex: %d, IsTop: %v, PositionType: %v, MoveOrder: %d",
+			stone.PointIndex, stone.Player, stone.StackIndex, stone.IsTop, core.GetEnumName(core.PositionTypeEnum, stone.PositionType), stone.MoveOrder)
+	}
+	t.Log("----------------------------------------------")
+
+	// Önce bar'da taş var mı kontrolü
+	result := core.IsBarEntryAllowed(stones, player, dice)
+	if result.FromBar {
+		t.Error("Bar'da taş olduğu görünüyor ama olmamalı, FromBar false olmalı")
+	}
+
+	// Normal hamle izni kontrolü
+	result = core.IsNormalMoveAllowed(stones, player, fromPoint, toPoint, dice)
+	if !result.Allowed {
+		t.Fatalf("Normal hareket izni verilmedi ama verilmeliydi: %d -> %d", fromPoint, toPoint)
+	}
+
+	// Hareketi uygula
+	updatedStones, moved := core.MoveTopStoneAndUpdate(stones, player, fromPoint, toPoint)
+	if !moved {
+		t.Fatalf("Taş hareket etmedi ama mümkün olmalıydı: %d -> %d", fromPoint, toPoint)
+	}
+
+	// Kırılan taş bar’a gitmiş mi?
+	barCount := 0
+	for _, stone := range updatedStones {
+		if stone.Player == 1 && stone.PositionType == core.PositionTypeEnum.Bar {
+			barCount++
+		}
+	}
+	if barCount != 1 {
+		t.Errorf("Kırılan taş bar'a gönderilmedi. Beklenen: 1, Gerçek: %d", barCount)
+	}
+
+	// Hedef noktada Player 2'nin taşı var mı?
+	targetOccupied := false
+	for _, stone := range updatedStones {
+		if stone.Player == 2 && stone.PointIndex == toPoint {
+			targetOccupied = true
+			break
+		}
+	}
+	if !targetOccupied {
+		t.Errorf("Player 2'nin taşı hedef noktaya yerleştirilmedi: %d", toPoint)
+	}
+
+	t.Logf("Taş başarıyla hareket etti ve rakip taşı kırdı: Player %d, %d -> %d", player, fromPoint, toPoint)
+
+	t.Log("AFTER")
+	core.SortStonesByPlayerPointAndStackDesc(updatedStones)
+	t.Log("Taşların Son Durumu:")
+	for _, stone := range updatedStones {
+		t.Logf("PointIndex: %d, Player: %d, StackIndex: %d, IsTop: %v, PositionType: %v, MoveOrder: %d",
+			stone.PointIndex, stone.Player, stone.StackIndex, stone.IsTop, core.GetEnumName(core.PositionTypeEnum, stone.PositionType), stone.MoveOrder)
 	}
 }
 
