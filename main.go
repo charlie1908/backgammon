@@ -23,12 +23,21 @@ func main() {
 	}
 
 	//Zar At...
-	d1, d2, err := core.RollDice()
+	dices, err := core.RollDice()
 	if err != nil {
 		fmt.Println("Zar atılırken bir hata oluştu:", err)
 		return
 	}
-	fmt.Printf("Zarlar: %d, %d\n", d1, d2)
+
+	var strDice string
+	for i, d := range dices {
+		if i > 0 {
+			strDice += ","
+		}
+		strDice += fmt.Sprintf("%d", d)
+	}
+
+	fmt.Printf("Zarlar: %s\n", strDice)
 
 	//stones, moved := core.MoveStoneAndUpdate(stones, 0, 11, 1)
 	stones, moved := core.MoveTopStoneAndUpdate(stones, 1, 0, 11)

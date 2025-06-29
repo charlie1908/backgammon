@@ -160,6 +160,7 @@ func PlayerHasTopStoneAt(stones []*LogicalCoordinate, player int, pointIndex int
 	return false
 }
 
+// Tasin oynayacagi PointIndex bos mu, ya da rakibin sadece 1 pulu mu var ?
 func CanMoveToPoint(stones []*LogicalCoordinate, player int, toPointIndex int) bool {
 	//Tasin oynanacagi yerde rakip tas var mi ve en fazla 1 tane mi ?
 	opponentCount := CountOpponentStonesAtPoint(stones, player, toPointIndex)
@@ -190,7 +191,7 @@ func PlayerMustEnterFromBar(stones []*LogicalCoordinate, player int) bool {
 }
 
 // Kirik tasi girebilecek mi? Girerse hangi zar veya zarlar ile girebilecek.
-func CanEnterFromBar(stones []*LogicalCoordinate, player int, dice []int) (bool, []int) {
+/*func CanEnterFromBar(stones []*LogicalCoordinate, player int, dice []int) (bool, []int) {
 	var enterableDice []int
 	for _, die := range dice {
 		entryPoint := GetEntryPoint(player, die)
@@ -202,9 +203,47 @@ func CanEnterFromBar(stones []*LogicalCoordinate, player int, dice []int) (bool,
 		}
 	}
 	return len(enterableDice) > 0, enterableDice
+}*/
+
+// Kirik butun taslari girebilecek mi? Girerse hangi zar veya zarlar ile girilebilecek. Double zar destegi icin ExpandDice() function kullan..
+func CanAllBarStonesEnter(stones []*LogicalCoordinate, player int, dice []int) (bool, []int) {
+	var usedDice []int
+	remainingDice := append([]int(nil), dice...) // Zarları kopyala
+	barStonesCount := 0
+
+	// Bar'daki kendi kirik taşlarını say
+	for _, stone := range stones {
+		if stone.Player == player && stone.PositionType == PositionTypeEnum.Bar {
+			barStonesCount++
+		}
+	}
+
+	if barStonesCount == 0 {
+		return true, []int{} // Zaten kirik bar taşı yok
+	}
+
+	// Her bar taşı için bir zar bulmaya çalış
+	for i := 0; i < barStonesCount; i++ {
+		found := false
+		for j, die := range remainingDice {
+			entryPoint := GetEntryPoint(player, die)
+			if CanMoveToPoint(stones, player, entryPoint) {
+				usedDice = append(usedDice, die) //Ise yarar zar, kirik bir tas icin kullanilir.
+				// Bu zarı kullan, listeden çıkar
+				remainingDice = append(remainingDice[:j], remainingDice[j+1:]...)
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false, usedDice // Bu taş için zar yok, işlem başarısız
+		}
+	}
+
+	return true, usedDice // Her taş için zar bulundu
 }
 
-// Player'a gore atilan zarin tavlada karsiligi
+// Player'a gore atilan zarin, tavlada PontIndex karsiligi bulunur.
 func GetEntryPoint(player int, die int) int {
 	if player == 1 {
 		return die - 1 // 1 → 0, 6 → 5 => 0..5 (kendi başlangıç)
@@ -220,7 +259,8 @@ func IsBarEntryAllowed(stones []*LogicalCoordinate, player int, dice []int) mode
 
 	if PlayerMustEnterFromBar(stones, player) {
 		result.FromBar = true
-		canEnter, enterableDice := CanEnterFromBar(stones, player, dice)
+		//canEnter, enterableDice := CanEnterFromBar(stones, player, dice)
+		canEnter, enterableDice := CanAllBarStonesEnter(stones, player, dice)
 		result.CanEnterFromBar = canEnter
 		result.EnterableDice = enterableDice
 		result.Allowed = canEnter
@@ -409,7 +449,7 @@ func rollDie() (int, error) {
 	}
 }
 
-func RollDice() (int, int, error) {
+func RollDice_Old() (int, int, error) {
 	d1, err := rollDie()
 	if err != nil {
 		return 0, 0, err
@@ -419,4 +459,28 @@ func RollDice() (int, int, error) {
 		return 0, 0, err
 	}
 	return d1, d2, nil
+}
+
+func RollDice() ([]int, error) {
+	d1, err := rollDie()
+	if err != nil {
+		return []int{0, 0}, err
+	}
+	d2, err := rollDie()
+	if err != nil {
+		return []int{0, 0}, err
+	}
+	return ExpandDice([]int{d1, d2}), err
+}
+
+// Double gelen zarlari 4ler
+// originalDice := []int{6, 6}            // double
+// expandedDice := ExpandDice(originalDice) // => [6, 6, 6, 6]
+func ExpandDice(dice []int) []int {
+	if len(dice) == 2 && dice[0] == dice[1] {
+		// Double zar atılmış, 4 kere kullanılmalı
+		return []int{dice[0], dice[0], dice[0], dice[0]}
+	}
+	// Normal zar
+	return dice
 }

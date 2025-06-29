@@ -203,7 +203,8 @@ func TestCanEnterFromBar_Player2_WithBrokenStone(t *testing.T) {
 	player := 2
 	dice := []int{1, 6}
 
-	canEnter, enterableDice := core.CanEnterFromBar(stones, player, dice)
+	//canEnter, enterableDice := core.CanEnterFromBar(stones, player, dice)
+	canEnter, enterableDice := core.CanAllBarStonesEnter(stones, player, dice)
 	if !canEnter {
 		t.Error("Player 2 should be able to enter from bar with at least one dice, but can't")
 	}
@@ -216,6 +217,7 @@ func TestCanEnterFromBar_Player2_WithBrokenStone(t *testing.T) {
 	}
 }
 
+// Player 2 kirik tasi ile, Player 1'in 23'deki tasini => 1,1 double atarak kirar..
 func TestCanEnterFromBar_Player2CanCaptureSingleOpponent(t *testing.T) {
 	stones := []*core.LogicalCoordinate{}
 
@@ -239,8 +241,9 @@ func TestCanEnterFromBar_Player2CanCaptureSingleOpponent(t *testing.T) {
 		MoveOrder:    0,
 	})
 
-	dice := []int{1}
-	canEnter, diceList := core.CanEnterFromBar(stones, 2, dice)
+	dice := core.ExpandDice([]int{1, 1})
+	//canEnter, diceList := core.CanEnterFromBar(stones, 2, dice)
+	canEnter, diceList := core.CanAllBarStonesEnter(stones, 2, dice)
 
 	if !canEnter {
 		t.Errorf("Player 2 bar’dan 1 zar ile giriş yapabilmeli (23. noktadaki tek rakip taşı kırarak), ama yapamıyor.")
@@ -356,6 +359,78 @@ func TestIsBarEntryAllowed_PartialEntry(t *testing.T) {
 	if !result.Allowed {
 		t.Error("En az bir zarla giriş mümkünken Allowed true olmalı")
 	}
+}
+
+// Cift Zar atildiginde [3,3] => 3 kirik tas PointIndex 2'ye girilebilir.
+func TestIsBarEntryAllowed_NoEntryForThreeBrokenStones(t *testing.T) {
+	stones := []*core.LogicalCoordinate{}
+	player := 1
+
+	// 3 adet kırık taş (Bar'da)
+	for i := 0; i < 3; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex:   -1,
+			PositionType: core.PositionTypeEnum.Bar,
+			Player:       player,
+			StackIndex:   i,
+			IsTop:        i == 2, // sadece en üst taş IsTop true
+			MoveOrder:    0,
+		})
+	}
+
+	// Player 2, giriş noktalarını kapatıyor: Entry 0 ve Entry 1
+	stones = append(stones, &core.LogicalCoordinate{
+		PointIndex:   0,
+		PositionType: core.PositionTypeEnum.Point,
+		Player:       2,
+		StackIndex:   0,
+		IsTop:        false,
+		MoveOrder:    0,
+	})
+	stones = append(stones, &core.LogicalCoordinate{
+		PointIndex:   0,
+		PositionType: core.PositionTypeEnum.Point,
+		Player:       2,
+		StackIndex:   1,
+		IsTop:        true,
+		MoveOrder:    0,
+	})
+	stones = append(stones, &core.LogicalCoordinate{
+		PointIndex:   1,
+		PositionType: core.PositionTypeEnum.Point,
+		Player:       2,
+		StackIndex:   0,
+		IsTop:        false,
+		MoveOrder:    0,
+	})
+	stones = append(stones, &core.LogicalCoordinate{
+		PointIndex:   1,
+		PositionType: core.PositionTypeEnum.Point,
+		Player:       2,
+		StackIndex:   1,
+		IsTop:        true,
+		MoveOrder:    0,
+	})
+
+	// Çift zarlar (double değil)
+	dice := core.ExpandDice([]int{3, 3})
+	//dice := []int{3, 3}
+
+	result := core.IsBarEntryAllowed(stones, player, dice)
+
+	if !result.FromBar {
+		t.Error("Bar'da taş var, FromBar true olmalı")
+	}
+
+	if !result.Allowed {
+		t.Error("Hiçbir taş giremeyecekken Allowed false olmalı")
+	}
+
+	if len(result.EnterableDice) > 0 && result.EnterableDice[0] != 3 {
+		t.Errorf("Giriş yapılabilecek sadece zar 3 olmalı, gelen: %v", result.EnterableDice)
+	}
+
+	t.Logf("Giris Yapilabilme Sonucu:%v Giris Yapılabılen zarlar: %v", result.Allowed, result.EnterableDice)
 }
 
 func TestIsBarEntryAllowed_NoEntry(t *testing.T) {
