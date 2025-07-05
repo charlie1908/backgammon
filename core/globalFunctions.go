@@ -9,10 +9,12 @@ import (
 // Global hareket sırası sayacı, oyun her başladığında sıfırlanmalı
 var globalMoveOrder int64 = 0
 
+// Yeni oyunda globalMoveOrder'i sifirlar.
 func ResetMoveOrder() {
 	globalMoveOrder = 0
 }
 
+// Tavlada baslangic taslarini dizer.
 func GetInitialStones() []*LogicalCoordinate {
 	var stones []*LogicalCoordinate
 
@@ -60,6 +62,7 @@ func GetInitialStones() []*LogicalCoordinate {
 	return stones
 }
 
+// Tum oyuncu taslarini once Playerlara gore sonra PontIndex ve en son StackIndex'e gore Desc dizer
 func SortStonesByPlayerPointAndStackDesc(stones []*LogicalCoordinate) {
 	sort.Slice(stones, func(i, j int) bool {
 		if stones[i].Player == stones[j].Player {
@@ -86,6 +89,10 @@ func SortStonesByPlayerPointAndStackAsc(stones []*LogicalCoordinate) {
 
 // Taşı hedef noktaya taşır ve MoveOrder günceller.
 // Sadece taşın eski ve yeni noktalarındaki taşlar güncellenir.
+
+// 1-) Kirik tasi var mi "IsBarEntryAllowed()" ve Taslar istenen PointIndex'e hareket edebiliyor mu "IsNormalMoveAllowed()" bakildiktan sonra cagrilir.
+// 2-) Taslarin PointIndexlerini gercekten yer degistirerek ayrica ayrildigi ve tasindigi guruplarin Stackindexlerini degistirerek taslari gerckten hareket ettirir.
+// 3-) Arada rakibin kirilan tasi var ise kirar..
 func MoveTopStoneAndUpdate(stones []*LogicalCoordinate, player int, fromPointIndex int, toPointIndex int) ([]*LogicalCoordinate, bool) {
 
 	//Normalde IsBarEntryAllowed(), IsNormalMoveAllowed() functionlari bu Methodun basinda cagrilip bakilmali. Ama gene de bir ekstra 3 kontrol koyma ihtiyaci duydum.
@@ -150,7 +157,7 @@ func MoveTopStoneAndUpdate(stones []*LogicalCoordinate, player int, fromPointInd
 	return stones, true
 }
 
-// Oynayacak Player'in belirtiln from noktasindaki taş dilimlerinde en üstte taşa sahip olup olmadığını kontrol eder.
+// Oynayacak Player'in belirtilen from noktasindaki taş dilimlerinde en üstte taşa sahip olup olmadığını kontrol eder.
 func PlayerHasTopStoneAt(stones []*LogicalCoordinate, player int, pointIndex int) bool {
 	for _, stone := range stones {
 		if stone.Player == player && stone.PointIndex == pointIndex && stone.IsTop {
@@ -170,6 +177,7 @@ func CanMoveToPoint(stones []*LogicalCoordinate, player int, toPointIndex int) b
 	return opponentCount <= 1
 }
 
+// Rakip oyuncunun belirtilen noktada (PointIndex) kac tasi var onu hesaplar..
 func CountOpponentStonesAtPoint(stones []*LogicalCoordinate, player int, pointIndex int) int {
 	count := 0
 	for _, stone := range stones {
@@ -180,7 +188,7 @@ func CountOpponentStonesAtPoint(stones []*LogicalCoordinate, player int, pointIn
 	return count
 }
 
-// Bar’da taşı olan oyuncu başka hamle yapamaz!
+// Bar’da Kirik taşı olan oyuncu başka hamle yapamaz!
 func PlayerMustEnterFromBar(stones []*LogicalCoordinate, player int) bool {
 	for _, stone := range stones {
 		if stone.Player == player && stone.PositionType == PositionTypeEnum.Bar {
@@ -205,7 +213,7 @@ func PlayerMustEnterFromBar(stones []*LogicalCoordinate, player int) bool {
 	return len(enterableDice) > 0, enterableDice
 }*/
 
-// Kirik butun taslari girebilecek mi? Girerse hangi zar veya zarlar ile girilebilecek. Double zar destegi icin ExpandDice() function kullan..
+// Kirik butun taslari girebilecek mi? Girerse hangi zar veya zarlar ile girilebilecek. Double(Cift) zar destegi icin ExpandDice() function kullan..
 func CanAllBarStonesEnter(stones []*LogicalCoordinate, player int, dice []int) (bool, []int) {
 	var usedDice []int
 	remainingDice := append([]int(nil), dice...) // Zarları kopyala
@@ -244,6 +252,7 @@ func CanAllBarStonesEnter(stones []*LogicalCoordinate, player int, dice []int) (
 }
 
 // Player'a gore atilan zarin, tavlada PontIndex karsiligi bulunur.
+// PointIndex 0'dan baslar zarlarin PointIndex karsiligi (-1) 1 eksigidir.
 func GetEntryPoint(player int, die int) int {
 	if player == 1 {
 		return die - 1 // 1 → 0, 6 → 5 => 0..5 (kendi başlangıç)
@@ -263,13 +272,24 @@ func IsBarEntryAllowed(stones []*LogicalCoordinate, player int, dice []int) mode
 		canEnter, enterableDice := CanAllBarStonesEnter(stones, player, dice)
 		result.CanEnterFromBar = canEnter
 		result.EnterableDice = enterableDice
+		result.UsedDice = enterableDice
 		result.Allowed = canEnter
+
+		//Kullanilmayan geride kalan zarlar hesaplanir
+		if canEnter && len(enterableDice) > 0 {
+			result.RemainingDice = CalculateRemainingDice(dice, enterableDice)
+		} else {
+			result.RemainingDice = dice // veya boş liste []int{}, tercihe göre
+		}
+
 		return result
 	}
 
 	// Bar’da taş yok, izin yok demiyoruz, sadece bar durumu değil. Yani Kirik tasi yok..
 	result.FromBar = false
-	result.Allowed = false
+	//result.Allowed = false
+	result.Allowed = true
+	result.RemainingDice = dice
 	return result
 }
 
@@ -295,6 +315,7 @@ func IsNormalMoveAllowed_Old(stones []*LogicalCoordinate, player int, fromPointI
 // Eğer biri uygunsa hareket mümkün kabul ediliyor.
 func IsNormalMoveAllowed(stones []*LogicalCoordinate, player int, fromPointIndex int, toPointIndex int, dice []int) models.MoveCheckResult {
 	result := models.MoveCheckResult{}
+	usedDie := []int{}
 
 	// Oyuncuya göre hareket yönü belirle
 	direction := 1
@@ -316,11 +337,13 @@ func IsNormalMoveAllowed(stones []*LogicalCoordinate, player int, fromPointIndex
 		for _, d := range dice {
 			if d == distance && CanMoveToPoint(stones, player, fromPointIndex+direction*d) {
 				canMove = true
+				usedDie = []int{d}
 				break
 			}
 		}
 	}
 
+	// İki farklı zarla (normal durum)
 	if !canMove && len(dice) == 2 {
 		d1, d2 := dice[0], dice[1]
 
@@ -328,15 +351,67 @@ func IsNormalMoveAllowed(stones []*LogicalCoordinate, player int, fromPointIndex
 		posAfterFirst := fromPointIndex + direction*d1
 		posAfterSecond := posAfterFirst + direction*d2
 		if CanMoveToPoint(stones, player, posAfterFirst) && CanMoveToPoint(stones, player, posAfterSecond) && posAfterSecond == toPointIndex {
+			usedDie = []int{d1, d2}
 			canMove = true
 		}
 
-		// Önce d2 sonra d1 ile hareket dene
-		posAfterFirst = fromPointIndex + direction*d2
-		posAfterSecond = posAfterFirst + direction*d1
-		if CanMoveToPoint(stones, player, posAfterFirst) && CanMoveToPoint(stones, player, posAfterSecond) && posAfterSecond == toPointIndex {
+		if !canMove {
+			// Önce d2 sonra d1 ile hareket dene
+			posAfterFirst = fromPointIndex + direction*d2
+			posAfterSecond = posAfterFirst + direction*d1
+			if CanMoveToPoint(stones, player, posAfterFirst) && CanMoveToPoint(stones, player, posAfterSecond) && posAfterSecond == toPointIndex {
+				usedDie = []int{d1, d2}
+				canMove = true
+			}
+		}
+	}
+
+	// *** 3 zarla hareket kontrolü buraya eklendi ***
+	if !canMove && len(dice) == 4 {
+		// 3 zar kullanarak hedefe varma kontrolü (örn: ilk 3 zarla)
+		sum := 0
+		canReach := true
+		for i := 1; i <= 3; i++ {
+			sum += dice[0] // hepsi aynı zar (double) olduğu için dice[0]
+			intermediate := fromPointIndex + direction*sum
+
+			if i < 3 && !CanMoveToPoint(stones, player, intermediate) { // ara noktalar engelli mi?
+				canReach = false
+				break
+			}
+		}
+		if canReach && (fromPointIndex+direction*sum) == toPointIndex && CanMoveToPoint(stones, player, toPointIndex) {
+			usedDie = []int{dice[0], dice[1], dice[2]} // ilk 3 zar kullanıldı
 			canMove = true
 		}
+	}
+
+	// Double zar durumunda 4 adımda hedefe ulaşabiliyor muyuz?
+	if !canMove && len(dice) == 4 {
+		sum := 0
+		for i := 1; i <= 4; i++ {
+			sum += dice[0] // Hepsi aynı olduğundan dice[0] yeterlidir
+			intermediate := fromPointIndex + direction*sum
+
+			// Ara noktalarda rakip taşlar varsa hareket geçersiz
+			if i < 4 && !CanMoveToPoint(stones, player, intermediate) {
+				break
+			}
+
+			// Dördüncü adımda hedefe ulaşılmış ve taş konulabilir mi?
+			if i == 4 && intermediate == toPointIndex && CanMoveToPoint(stones, player, toPointIndex) {
+				usedDie = []int{dice[0], dice[1], dice[2], dice[3]} // ya da 4x dice[0]
+				canMove = true
+			}
+		}
+	}
+
+	//Kullanilip geride kalan kullanilmamis zarlar burada tanimlanir.
+	if canMove && len(usedDie) > 0 {
+		result.RemainingDice = CalculateRemainingDice(dice, usedDie)
+		result.UsedDice = usedDie
+	} else {
+		result.RemainingDice = []int{}
 	}
 
 	result.FromBar = false
@@ -483,4 +558,23 @@ func ExpandDice(dice []int) []int {
 	}
 	// Normal zar
 	return dice
+}
+
+// Zarlardan ise yararlar kullanildiktan sonra geri kanaln zarlar
+// dice = [4,4,4,4], used = [4,4,4] → kalan: [4]
+func CalculateRemainingDice(dice []int, used []int) []int {
+	remaining := make([]int, len(dice))
+	copy(remaining, dice)
+
+	for _, usedDie := range used {
+		for i, remDie := range remaining {
+			if remDie == usedDie {
+				// Bu zarı kullandık, listeden çıkar
+				remaining = append(remaining[:i], remaining[i+1:]...)
+				break
+			}
+		}
+	}
+
+	return remaining
 }

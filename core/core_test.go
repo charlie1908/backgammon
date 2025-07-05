@@ -578,3 +578,159 @@ func TestPlayer2CannotMoveToBlockedPoint(t *testing.T) {
 		t.Log("Blokajlı noktaya hareket engellendi, test başarılı")
 	}
 }
+
+// 24 Bear off Tek Taşı çift atıp 0 noktasından => 24 ile dışarı almak
+func TestIsNormalMoveAllowed_DoubleDiceValidPath(t *testing.T) {
+	stones := []*core.LogicalCoordinate{}
+	player := 1
+
+	// Oyuncunun taşı 0. noktada (başlangıç)
+	stones = append(stones, &core.LogicalCoordinate{
+		PointIndex:   0,
+		PositionType: core.PositionTypeEnum.Point,
+		Player:       player,
+		StackIndex:   0,
+		IsTop:        true,
+		MoveOrder:    0,
+	})
+
+	// Ara noktalar ve hedef boş, yani hareket serbest
+	// Dice = [6,6,6,6] => Toplam 24 ilerleme -> 0 → 6 → 12 → 18 → 24 (bear off yapılmazsa 23 yeterli)
+	toPoint := 24 // Bear off'a çıkmak gibi düşün. 24 Demek taşı toplamak demek..
+
+	dice := []int{6, 6, 6, 6}
+
+	result := core.IsNormalMoveAllowed(stones, player, 0, toPoint, dice)
+
+	if !result.Allowed {
+		t.Errorf("Double zarla 4 adımda hedefe ulaşmak mümkün olmalıydı. Sonuç: %+v", result)
+	}
+	t.Log("Tek Taş dışarı başarı ile alındı...")
+}
+
+func Test_Player1_BarAndMove_WithDoubleFour(t *testing.T) {
+	core.ResetMoveOrder()
+
+	var stones []*core.LogicalCoordinate
+
+	// Player 1: 3 kırık taş (Bar'da)
+	for i := 0; i < 3; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex:   -1,
+			PositionType: core.PositionTypeEnum.Bar,
+			Player:       1,
+			StackIndex:   i,
+			IsTop:        i == 2,
+			MoveOrder:    0,
+		})
+	}
+
+	// Player 2: 5 taş PointIndex 5'te
+	for i := 0; i < 5; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex:   5,
+			PositionType: core.PositionTypeEnum.Point,
+			Player:       2,
+			StackIndex:   i,
+			IsTop:        i == 4,
+			MoveOrder:    0,
+		})
+	}
+
+	// Player 1: 2 taş PointIndex 0'da (bar girişi için engel değil)
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex:   0,
+			PositionType: core.PositionTypeEnum.Point,
+			Player:       1,
+			StackIndex:   i,
+			IsTop:        i == 1,
+			MoveOrder:    0,
+		})
+	}
+
+	// Player 2: 3 taş PointIndex 7'de
+	for i := 0; i < 3; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex:   7,
+			PositionType: core.PositionTypeEnum.Point,
+			Player:       2,
+			StackIndex:   i,
+			IsTop:        i == 2,
+			MoveOrder:    0,
+		})
+	}
+
+	// Zar: Double 5 → [5, 5, 5, 5]
+	dice := []int{5, 5}
+	expandedDice := core.ExpandDice(dice)
+
+	// 1. Bar girişine izin var mı?
+	barResult := core.IsBarEntryAllowed(stones, 1, expandedDice)
+	if !barResult.FromBar {
+		t.Fatal("Bar'da kırık taş varken FromBar true olmalı")
+	}
+	if !barResult.Allowed {
+		t.Fatal("Bar girişine izin verilmedi, oysa en az 1 taş girebilmeli")
+	}
+	if len(barResult.UsedDice) != 3 {
+		t.Fatalf("Bar'dan girişte kullanılan zar sayısı 3 olmalı, mevcut: %d", len(barResult.UsedDice))
+	}
+	if len(barResult.RemainingDice) != 1 || barResult.RemainingDice[0] != 5 {
+		t.Fatalf("Kalan zarlar [5] olmalı, mevcut: %v", barResult.RemainingDice)
+	}
+
+	// 2. Bar'dan mümkün olduğunca taşları Player 1 adina sokalım
+	used := 0
+	for _, die := range barResult.EnterableDice {
+		if used >= 3 {
+			break // sadece 3 kırık taş var
+		}
+		entryPoint := core.GetEntryPoint(1, die)
+
+		var moved bool
+		stones, moved = core.MoveTopStoneAndUpdate(stones, 1, -1, entryPoint)
+		if !moved {
+			t.Fatalf("Bar'dan taş %d için hareket başarısız", used+1)
+		}
+		used++
+	}
+
+	if used != 3 {
+		t.Fatalf("Bar'dan 3 taş yerine %d taş sokulabildi", used)
+	}
+
+	// 3. Kalan 1 hamleyle Player 1 icin 4 → 9 oynayalım
+	moveResult := core.IsNormalMoveAllowed(stones, 1, 4, 9, barResult.RemainingDice)
+	if !moveResult.Allowed {
+		t.Fatal("4'ten 9'ye hareket izni verilmedi (Player 1)")
+	}
+	stones, moved := core.MoveTopStoneAndUpdate(stones, 1, 4, 9)
+	if !moved {
+		t.Fatal("4'ten 9'ye taşıma başarısız")
+	}
+
+	// --- Kontroller ---
+
+	// PointIndex 4'te 2 taş olmalı (bar giriş taşları)
+	count := 0
+	for _, s := range stones {
+		if s.Player == 1 && s.PointIndex == 4 {
+			count++
+		}
+	}
+	if count != 2 {
+		t.Fatalf("PointIndex 4'te beklenen 2 taş yok, mevcut: %d", count)
+	}
+
+	// PointIndex 9'de Player 1'ye ait 1 taş olmalı
+	player1Count := 0
+	for _, s := range stones {
+		if s.Player == 1 && s.PointIndex == 9 { // Player 1'in 1 tasi Point 9'a geldi..
+			player1Count++
+		}
+	}
+	if player1Count != 1 { // yeni tas geldi 1 oldu
+		t.Fatalf("PointIndex 9'de Player 1'nin taş sayısı beklenenden farklı, mevcut: %d", player1Count)
+	}
+}

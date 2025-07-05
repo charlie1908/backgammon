@@ -9,4 +9,6 @@ type MoveCheckResult struct {
 	EnterableDice   []int //Kirik hangi zarlar ile giriyor ?
 	CanMoveNormally bool  // Kirik yok pul oraya hareket edebiliyor mu ?
 	NormalDice      []int // Zar mesafasi ile uyum kontrolu..
+	RemainingDice   []int // Bu hamleden sonra kalacak zarlar
+	UsedDice        []int // Bu hamlede kullanılan zarlar
 }
