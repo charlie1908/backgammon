@@ -313,6 +313,7 @@ func IsNormalMoveAllowed_Old(stones []*LogicalCoordinate, player int, fromPointI
 // Önce tek zarla hareket deneniyor,
 // Sonra zarların iki farklı sırasıyla adım adım kontrol ediliyor,
 // Eğer biri uygunsa hareket mümkün kabul ediliyor.
+// Cift zar var ise 3lu ve 4lu hareketi kontrol ediliyor.
 func IsNormalMoveAllowed(stones []*LogicalCoordinate, player int, fromPointIndex int, toPointIndex int, dice []int) models.MoveCheckResult {
 	result := models.MoveCheckResult{}
 	usedDie := []int{}
@@ -411,7 +412,7 @@ func IsNormalMoveAllowed(stones []*LogicalCoordinate, player int, fromPointIndex
 		result.RemainingDice = CalculateRemainingDice(dice, usedDie)
 		result.UsedDice = usedDie
 	} else {
-		result.RemainingDice = []int{}
+		result.RemainingDice = dice
 	}
 
 	result.FromBar = false
@@ -482,7 +483,7 @@ func UpdateStacks_Old(stones []*LogicalCoordinate, pointsToUpdate []int) []*Logi
 	return updatedStones
 }
 
-// Sadece verilen noktaların taşlarını günceller
+// Sadece verilen noktaların taşlarını günceller. Hem PointIndex hem de StackIndex guncellenir.
 func UpdateStacks(stones []*LogicalCoordinate, pointsToUpdate []int) []*LogicalCoordinate {
 	// pointsToUpdate'deki her nokta için işlemi yap
 	for _, pointIndex := range pointsToUpdate {
@@ -560,7 +561,7 @@ func ExpandDice(dice []int) []int {
 	return dice
 }
 
-// Zarlardan ise yararlar kullanildiktan sonra geri kanaln zarlar
+// Zarlardan ise yararlar kullanildiktan sonra geri kalan zarlar..
 // dice = [4,4,4,4], used = [4,4,4] → kalan: [4]
 func CalculateRemainingDice(dice []int, used []int) []int {
 	remaining := make([]int, len(dice))
@@ -577,4 +578,37 @@ func CalculateRemainingDice(dice []int, used []int) []int {
 	}
 
 	return remaining
+}
+
+// Oynanabilir zarlara gore belirlenen PointIndex'deki tas ile gidilebilecek PointIndexler yani hamleler hesaplanir.
+func GetPossibleMovePoints(
+	stones []*LogicalCoordinate,
+	player int,
+	fromPointIndex int,
+	remainingDice []int,
+) []int {
+	direction := 1
+	if player == 2 {
+		direction = -1
+	}
+
+	var possiblePoints []int
+
+	if !PlayerHasTopStoneAt(stones, player, fromPointIndex) {
+		return possiblePoints
+	}
+
+	for _, die := range remainingDice {
+		toPointIndex := fromPointIndex + direction*die
+
+		if toPointIndex < 0 || toPointIndex >= 24 {
+			continue
+		}
+
+		if CanMoveToPoint(stones, player, toPointIndex) {
+			possiblePoints = append(possiblePoints, toPointIndex)
+		}
+	}
+
+	return possiblePoints
 }

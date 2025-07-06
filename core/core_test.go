@@ -466,8 +466,9 @@ func TestIsBarEntryAllowed_NoEntry(t *testing.T) {
 	})
 
 	// Zarlar sadece 1 (entry 0'a giriş, kapalı)
-	dice := []int{1, 1}
-
+	//dice := []int{1, 1}
+	// Çift zarlar (double değil)
+	dice := core.ExpandDice([]int{1, 1})
 	result := core.IsBarEntryAllowed(stones, player, dice)
 
 	if !result.FromBar {
@@ -732,5 +733,159 @@ func Test_Player1_BarAndMove_WithDoubleFour(t *testing.T) {
 	}
 	if player1Count != 1 { // yeni tas geldi 1 oldu
 		t.Fatalf("PointIndex 9'de Player 1'nin taş sayısı beklenenden farklı, mevcut: %d", player1Count)
+	}
+}
+
+func TestPlayer2PossibleMoves(t *testing.T) {
+	player1 := 1
+	player2 := 2
+
+	var stones []*core.LogicalCoordinate
+
+	// Player 1 taşları
+	for i := 0; i < 5; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex: 0,
+			Player:     player1,
+			IsTop:      i == 4, // sadece sonuncu top taş
+		})
+	}
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex: 11,
+			Player:     player1,
+			IsTop:      i == 1,
+		})
+	}
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex: 13,
+			Player:     player1,
+			IsTop:      i == 1,
+		})
+	}
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex: 15,
+			Player:     player1,
+			IsTop:      i == 1,
+		})
+	}
+
+	// Player 2 taşları
+	stones = append(stones, &core.LogicalCoordinate{PointIndex: 4, Player: player2, IsTop: true})
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 5, Player: player2, IsTop: i == 1})
+	}
+	for i := 0; i < 3; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 6, Player: player2, IsTop: i == 2})
+	}
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 7, Player: player2, IsTop: i == 1})
+	}
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 12, Player: player2, IsTop: i == 1})
+	}
+	for i := 0; i < 5; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 23, Player: player2, IsTop: i == 4})
+	}
+
+	dice := []int{3, 2}
+
+	// Player 2 için 23 ve 12 noktasından hareketler
+	possibleFrom23 := core.GetPossibleMovePoints(stones, player2, 23, dice)
+	possibleFrom12 := core.GetPossibleMovePoints(stones, player2, 12, dice)
+
+	t.Logf("Player 2 taşları 23 noktasından gidebileceği noktalar: %v", possibleFrom23)
+	t.Logf("Player 2 taşları 12 noktasından gidebileceği noktalar: %v", possibleFrom12)
+
+	expected := []int{20, 21}
+	if !reflect.DeepEqual(possibleFrom23, expected) {
+		t.Fatalf("PointIndex 20 ve 21 olmasi gerekir!")
+	}
+
+	expected2 := []int{9, 10}
+	if !reflect.DeepEqual(possibleFrom12, expected2) {
+		t.Fatalf("PointIndex 9 ve 10 olmasi gerekir!")
+	}
+}
+
+func TestPlayer1ComplexPossibleMoves(t *testing.T) {
+	player1 := 1
+	player2 := 2
+	var stones []*core.LogicalCoordinate
+
+	// --- Player 1 Taşları (hareket etmesi beklenen oyuncu) ---
+	// PointIndex 23: 2 taş
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex: 23,
+			Player:     player1,
+			IsTop:      i == 1,
+		})
+	}
+	// PointIndex 16: 1 taş
+	stones = append(stones, &core.LogicalCoordinate{
+		PointIndex: 16,
+		Player:     player1,
+		IsTop:      true,
+	})
+	// PointIndex 11: 3 taş
+	for i := 0; i < 3; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex: 11,
+			Player:     player1,
+			IsTop:      i == 2,
+		})
+	}
+
+	// --- Player 2 Taşları (engel teşkil edecek) ---
+	// PointIndex 18: 2 taş (blok, girilemez)
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex: 18,
+			Player:     player2,
+			IsTop:      i == 1,
+		})
+	}
+	// PointIndex 21: 1 taş (vurulabilir)
+	stones = append(stones, &core.LogicalCoordinate{
+		PointIndex: 21,
+		Player:     player2,
+		IsTop:      true,
+	})
+
+	// PointIndex 13: 3 taş
+	for i := 0; i < 3; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex: 13,
+			Player:     player2,
+			IsTop:      i == 2,
+		})
+	}
+
+	// Zar: [5, 2]
+	dice := []int{5, 2}
+
+	// --- Test ---
+	from23 := core.GetPossibleMovePoints(stones, player1, 23, dice)
+	from18 := core.GetPossibleMovePoints(stones, player2, 18, dice)
+	from11 := core.GetPossibleMovePoints(stones, player1, 11, dice)
+
+	t.Logf("Player 1 - 23'ten oynanabilir noktalar: %v", from23)
+	t.Logf("Player 2 - 18'den oynanabilir noktalar: %v", from18)
+	t.Logf("Player 1 - 11'den oynanabilir noktalar: %v", from11)
+
+	if from23 != nil {
+		t.Fatalf("23'ten Player1 hicbir yere gidememeli ama bulundu: %v", from23)
+	}
+
+	expectedFrom18 := []int{13, 16}
+	if !reflect.DeepEqual(from18, expectedFrom18) {
+		t.Fatalf("18'den 13 ve 16'ya gidilebilmeli, ama su sonuc bulundu: %v", from18)
+	}
+	expectedFrom11 := []int{16}
+	if !reflect.DeepEqual(from11, expectedFrom11) {
+		t.Fatalf("18'den 16'ya gidilebilmeli ama, bulundu: %v", from18)
 	}
 }
