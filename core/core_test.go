@@ -4,6 +4,7 @@ import (
 	"backgammon/core"
 	"fmt"
 	"reflect"
+	"slices"
 	"testing"
 )
 
@@ -887,5 +888,379 @@ func TestPlayer1ComplexPossibleMoves(t *testing.T) {
 	expectedFrom11 := []int{16}
 	if !reflect.DeepEqual(from11, expectedFrom11) {
 		t.Fatalf("18'den 16'ya gidilebilmeli ama, bulundu: %v", from18)
+	}
+}
+
+func TestAreAllStonesInBearOffArea_Valid(t *testing.T) {
+	player := 1
+	var stones []*core.LogicalCoordinate
+
+	// Player 1'in tüm taşları toplama alanında (18–23)
+	for i := 18; i <= 23; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex: i,
+			Player:     player,
+		})
+	}
+
+	// Toplanmış bir taş da olabilir
+	stones = append(stones, &core.LogicalCoordinate{
+		PointIndex: 24,
+		Player:     player,
+	})
+
+	ok := core.AreAllStonesInBearOffArea(stones, player)
+	if !ok {
+		t.Fatal("Beklenen: true, ancak false döndü")
+	}
+}
+
+func TestAreAllStonesInBearOffArea_Invalid(t *testing.T) {
+	player := 1
+	var stones []*core.LogicalCoordinate
+
+	// Toplama alanında taşlar
+	for i := 18; i <= 22; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex: i,
+			Player:     player,
+		})
+	}
+
+	//Hatali: Kirik Tasi var
+	stones = append(stones, &core.LogicalCoordinate{
+		PointIndex: -1,
+		Player:     player,
+	})
+
+	// Hatalı: 10. noktada bir taş
+	stones = append(stones, &core.LogicalCoordinate{
+		PointIndex: 10,
+		Player:     player,
+	})
+
+	ok := core.AreAllStonesInBearOffArea(stones, player)
+	if ok {
+		t.Fatal("Beklenen: false, ancak true döndü")
+	}
+}
+
+func TestCanBearOffStone_InValid(t *testing.T) {
+	player := 1
+	dice := []int{3, 5}
+
+	// Taşların toplama alanında olduğu bir durum (player 1 için 18-23 arası)
+	stones := []*core.LogicalCoordinate{
+		{Player: player, PointIndex: 18, IsTop: true},
+		{Player: player, PointIndex: 19, IsTop: true},
+		{Player: player, PointIndex: 20, IsTop: true},
+		{Player: player, PointIndex: 21, IsTop: true},
+		{Player: player, PointIndex: 22, IsTop: true},
+		{Player: player, PointIndex: 23, IsTop: true},
+	}
+
+	// PointIndex 20'deki taş, zar 4 olmasa da 3 zarı ile çıkamaz, 5 ile çıkabilir
+	// Mesafe: 23 - 20 + 1 = 4, zarlarda 3 ve 5 var, 3 eşit değil, 5 büyük
+
+	pointIndex := 20
+
+	canBearOff, _, _ := core.CanBearOffStone(stones, player, pointIndex, dice)
+
+	if canBearOff {
+		t.Fatalf("Taş toplanamamli ama toplanabiliyor. Geride tas var 5(19) ve 6(18)'da")
+	}
+}
+
+// Tas Toplamayi test amacli yazilmis test. CanBearOffStone()
+// TestCanBearOffStone_Valid tests the functionality of CanBearOffStone ensuring a player can bear off a stone with valid conditions.
+func TestCanBearOffStone_Valid(t *testing.T) {
+	player := 1
+	dice := []int{3, 5}
+
+	// Player 1 taşları sadece toplama alanında, daha geride taş yok
+	stones := []*core.LogicalCoordinate{
+		{Player: player, PointIndex: 20, IsTop: true}, // Toplanacak taş
+		{Player: player, PointIndex: 21, IsTop: true},
+		{Player: player, PointIndex: 22, IsTop: true},
+		{Player: player, PointIndex: 23, IsTop: true},
+	}
+
+	pointIndex := 20
+
+	canBearOff, remainingDice, usedDice := core.CanBearOffStone(stones, player, pointIndex, dice)
+
+	if !canBearOff {
+		t.Fatalf("Taş toplanabilmeli ama toplanamıyor")
+	}
+
+	t.Logf("Kullanilan zar: %v", usedDice)
+	// Mesafe = 23 - 20 + 1 = 4, zar 3 yok, 5 var; 5 ile toplanabilir, kalan zar 3 olmalı
+	expectedRemaining := []int{3}
+	if !reflect.DeepEqual(remainingDice, expectedRemaining) {
+		t.Fatalf("Kalan zarlar yanlış, beklenen: %v, bulunan: %v", expectedRemaining, remainingDice)
+	}
+}
+
+// TestPlayer2CollectStones verifies that Player 2 can collect all stones according to the game rules without errors.
+func TestPlayer2CollectStones(t *testing.T) {
+	maxTries := 100
+	tries := 0
+
+	player := 2
+	stones := []*core.LogicalCoordinate{}
+
+	// Player 2 - PointIndex 5: 5 taş
+	for i := 0; i < 5; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex: 5,
+			Player:     player,
+			IsTop:      i == 4,
+		})
+	}
+	// Player 2 - PointIndex 2: 4 taş
+	for i := 0; i < 4; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex: 2,
+			Player:     player,
+			IsTop:      i == 3,
+		})
+	}
+	// Player 2 - PointIndex 3: 3 taş
+	for i := 0; i < 3; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex: 3,
+			Player:     player,
+			IsTop:      i == 2,
+		})
+	}
+	// Player 2 - PointIndex 1: 2 taş
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex: 1,
+			Player:     player,
+			IsTop:      i == 1,
+		})
+	}
+	// Player 2 - PointIndex 2: 1 taş
+	stones = append(stones, &core.LogicalCoordinate{
+		PointIndex: 2,
+		Player:     player,
+		IsTop:      true,
+	})
+	// Player 1 - PointIndex 0: 2 taş
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex: 0,
+			Player:     1,
+			IsTop:      i == 1,
+		})
+	}
+
+	//Tum taslar bitene kadar
+	for !core.IsFinishedForPlayer(stones, player) {
+		tries++
+		if tries > maxTries {
+			t.Fatalf("Test sonsuz döngüye girdi, taşlar toplanamadı")
+		}
+		dice, err := core.RollDice()
+		if err != nil {
+			t.Fatal(err)
+		}
+		slices.SortFunc(dice, func(a, b int) int {
+			return b - a // Büyükten küçüğe sıralama
+		})
+
+		for len(dice) > 0 {
+			moved := false
+			for index := 5; index >= 0; index-- {
+				result, remainingDice, usedDice := core.CanBearOffStone(stones, player, index, dice)
+				if result {
+					stones, result = core.MoveTopStoneAndUpdate(stones, player, index, 24)
+					if !result {
+						t.Fatalf("MoveTopStoneAndUpdate başarısız oldu: index %d", index)
+					}
+					//Zarlar Player'a gore gercek degeri ile gosterilir.
+					entryPoints := []int{}
+					for _, d := range dice {
+						entryPoints = append(entryPoints, d-1)
+					}
+					var tmpRemainingDice []int
+					for i, _ := range remainingDice {
+						tmpRemainingDice = append(tmpRemainingDice, remainingDice[i]-1)
+					}
+					if len(remainingDice) > 0 {
+						t.Logf("Toplanan Tas %d. Zarlar %v Kullanilan Zar: %v Kalan Zar: %v", index, entryPoints, usedDice[0]-1, tmpRemainingDice)
+					} else {
+						t.Logf("Toplanan Tas %d. Zarlar %v Kullanilan Zar: %v", index, entryPoints, usedDice[0]-1)
+					}
+					dice = remainingDice
+					moved = true
+					break
+				}
+				if index == 0 && !moved && len(remainingDice) > 0 {
+					var tmpRemainingDice []int
+					for i, _ := range remainingDice {
+						tmpRemainingDice = append(tmpRemainingDice, remainingDice[i]-1)
+					}
+					t.Logf("Kullanilamayan Zar: %v", tmpRemainingDice)
+				}
+			}
+			if !moved {
+				break // Bu zarlarla daha fazla hamle yapılamıyor
+			}
+		}
+	}
+
+	t.Log("Player 2 icin tum taslar toplandi")
+	for _, stone := range stones {
+		if stone.Player == player {
+			if stone.PointIndex != 24 {
+				t.Fatalf("Tum Taslar Toplanamadi")
+			}
+			t.Logf("Toplanan Tas %d", stone.PointIndex)
+		}
+	}
+}
+
+// *********Cok Onemli Test************
+// TestPlayer2CollectStonesWithBiggerDice verifies that Player 2 can collect all stones using dice rolls with a larger span.
+func TestPlayer2CollectStonesWithBiggerDice(t *testing.T) {
+	maxTries := 100
+	tries := 0
+
+	player := 2
+	stones := []*core.LogicalCoordinate{}
+
+	// Player 2 - PointIndex 4: 4 taş
+	/*for i := 0; i < 4; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex:   4,
+			Player:       player,
+			IsTop:        i == 3,
+			PositionType: core.PositionTypeEnum.Point,
+			StackIndex:   i,
+			MoveOrder:    0,
+		})
+	}*/
+
+	// Player 2 - PointIndex 3: 5 taş
+	for i := 0; i < 5; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex:   3,
+			Player:       player,
+			IsTop:        i == 4,
+			PositionType: core.PositionTypeEnum.Point,
+			StackIndex:   i,
+			MoveOrder:    0,
+		})
+	}
+	// Player 2 - PointIndex 2: 3 taş
+	for i := 0; i < 3; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex:   2,
+			Player:       player,
+			IsTop:        i == 2,
+			PositionType: core.PositionTypeEnum.Point,
+			StackIndex:   i,
+			MoveOrder:    0,
+		})
+	}
+	// Player 2 - PointIndex 1: 3 taş
+	for i := 0; i < 3; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex:   1,
+			Player:       player,
+			IsTop:        i == 2,
+			PositionType: core.PositionTypeEnum.Point,
+			StackIndex:   i,
+			MoveOrder:    0,
+		})
+	}
+	// Player 1 - PointIndex 4: 3 taş
+	for i := 0; i < 3; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex:   4,
+			Player:       1,
+			IsTop:        i == 2,
+			PositionType: core.PositionTypeEnum.Point,
+			StackIndex:   i,
+			MoveOrder:    0,
+		})
+	}
+	// Player 1 - PointIndex 0: 2 taş
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex:   0,
+			Player:       1,
+			IsTop:        i == 1,
+			PositionType: core.PositionTypeEnum.Point,
+			StackIndex:   i,
+			MoveOrder:    0,
+		})
+	}
+
+	//Tum taslar bitene kadar
+	for !core.IsFinishedForPlayer(stones, player) {
+		tries++
+		if tries > maxTries {
+			t.Fatalf("Test sonsuz döngüye girdi, taşlar toplanamadı")
+		}
+		dice, err := core.RollDice()
+		if err != nil {
+			t.Fatal(err)
+		}
+		slices.SortFunc(dice, func(a, b int) int {
+			return b - a // Büyükten küçüğe sıralama
+		})
+
+		for len(dice) > 0 {
+			moved := false
+			for index := 5; index >= 0; index-- {
+				result, remainingDice, usedDice := core.CanBearOffStone(stones, player, index, dice)
+				if result {
+					stones, result = core.MoveTopStoneAndUpdate(stones, player, index, 24)
+					if !result {
+						t.Fatalf("MoveTopStoneAndUpdate başarısız oldu: index %d", index)
+					}
+					//Zarlar Player'a gore gercek degeri ile gosterilir.
+					entryPoints := []int{}
+					for _, d := range dice {
+						entryPoints = append(entryPoints, d-1)
+					}
+					var tmpRemainingDice []int
+					for i, _ := range remainingDice {
+						tmpRemainingDice = append(tmpRemainingDice, remainingDice[i]-1)
+					}
+					if len(remainingDice) > 0 {
+						t.Logf("Toplanan Tas %d. Zarlar %v Kullanilan Zar: %v Kalan Zar: %v", index, entryPoints, usedDice[0]-1, tmpRemainingDice)
+					} else {
+						t.Logf("Toplanan Tas %d. Zarlar %v Kullanilan Zar: %v", index, entryPoints, usedDice[0]-1)
+					}
+					dice = remainingDice
+					moved = true
+					break
+				}
+				if index == 0 && !moved && len(remainingDice) > 0 {
+					var tmpRemainingDice []int
+					for i, _ := range remainingDice {
+						tmpRemainingDice = append(tmpRemainingDice, remainingDice[i]-1)
+					}
+					t.Logf("Kullanilamayan Zar: %v", tmpRemainingDice)
+				}
+			}
+			if !moved {
+				break // Bu zarlarla daha fazla hamle yapılamıyor
+			}
+		}
+	}
+
+	t.Log("Player 2 icin tum taslar toplandi")
+	for _, stone := range stones {
+		if stone.Player == player {
+			if stone.PointIndex != 24 {
+				t.Fatalf("Tum Taslar Toplanamadi")
+			}
+			t.Logf("Toplanan Tas %d", stone.PointIndex)
+		}
 	}
 }

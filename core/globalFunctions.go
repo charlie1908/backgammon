@@ -3,6 +3,7 @@ package core
 import (
 	"backgammon/models"
 	"crypto/rand"
+	"slices"
 	"sort"
 )
 
@@ -103,33 +104,37 @@ func MoveTopStoneAndUpdate(stones []*LogicalCoordinate, player int, fromPointInd
 	}
 
 	// 2. Hedef nokta geçerli mi?
-	if toPointIndex < 0 || toPointIndex >= 24 {
+	//if toPointIndex < 0 || toPointIndex >= 24 {
+	//Taslar Toplana da bilir..
+	if toPointIndex < 0 || toPointIndex > 24 {
 		return stones, false
 	}
 
-	//Karsi rakibin birden fazla tasi var mi ? ilgili PointIndex'inde..
-	// 3. Hedef nokta rakip tarafindan blokaj altinda mi ?
-	if !CanMoveToPoint(stones, player, toPointIndex) {
-		return stones, false // Hareket yasak
-	}
-
-	// 💥 Kırma kontrolü — hedef noktada 1 adet rakip taşı varsa kır ve bar'a gönder
-	if CountOpponentStonesAtPoint(stones, player, toPointIndex) == 1 {
-		for i, stone := range stones {
-			if stone.PointIndex == toPointIndex && stone.Player != player {
-				stones[i].PointIndex = -1
-				stones[i].PositionType = PositionTypeEnum.Bar
-				stones[i].StackIndex = 0
-				stones[i].IsTop = true
-
-				globalMoveOrder++
-				stones[i].MoveOrder = globalMoveOrder
-				break
-			}
+	// toPointIndex 24 değilse karsi rakibin taslari ile [len(stone)>1] blokaj ve kırma kontrollerini yap
+	if toPointIndex != 24 {
+		//Karsi rakibin birden fazla tasi var mi ? ilgili PointIndex'inde..
+		// 3. Hedef nokta rakip tarafindan blokaj altinda mi ?
+		if !CanMoveToPoint(stones, player, toPointIndex) {
+			return stones, false // Hareket yasak
 		}
-		stones = UpdateStacks(stones, []int{-1}) // Bar'daki taşların stack bilgisi güncellenir
-	}
 
+		// 💥 Kırma kontrolü — hedef noktada 1 adet rakip taşı varsa kır ve bar'a gönder
+		if CountOpponentStonesAtPoint(stones, player, toPointIndex) == 1 {
+			for i, stone := range stones {
+				if stone.PointIndex == toPointIndex && stone.Player != player {
+					stones[i].PointIndex = -1
+					stones[i].PositionType = PositionTypeEnum.Bar
+					stones[i].StackIndex = 0
+					stones[i].IsTop = true
+
+					globalMoveOrder++
+					stones[i].MoveOrder = globalMoveOrder
+					break
+				}
+			}
+			stones = UpdateStacks(stones, []int{-1}) // Bar'daki taşların stack bilgisi güncellenir
+		}
+	}
 	var moveIndex int = -1
 	// fromPointIndex'teki en üstteki ve player'a ait taşı bul
 	for i, stone := range stones {
@@ -146,7 +151,12 @@ func MoveTopStoneAndUpdate(stones []*LogicalCoordinate, player int, fromPointInd
 
 	oldPointIndex := stones[moveIndex].PointIndex
 	stones[moveIndex].PointIndex = toPointIndex
-	stones[moveIndex].PositionType = PositionTypeEnum.Point
+	//stones[moveIndex].PositionType = PositionTypeEnum.Point
+	if toPointIndex == 24 {
+		stones[moveIndex].PositionType = PositionTypeEnum.OffBoard
+	} else {
+		stones[moveIndex].PositionType = PositionTypeEnum.Point
+	}
 
 	globalMoveOrder++
 	stones[moveIndex].MoveOrder = globalMoveOrder
@@ -159,6 +169,10 @@ func MoveTopStoneAndUpdate(stones []*LogicalCoordinate, player int, fromPointInd
 
 // Oynayacak Player'in belirtilen from noktasindaki taş dilimlerinde en üstte taşa sahip olup olmadığını kontrol eder.
 func PlayerHasTopStoneAt(stones []*LogicalCoordinate, player int, pointIndex int) bool {
+	if pointIndex == 24 {
+		return false // offboard'daki taşlar zaten üstte olamaz, oynanamaz
+	}
+
 	for _, stone := range stones {
 		if stone.Player == player && stone.PointIndex == pointIndex && stone.IsTop {
 			return true
@@ -169,6 +183,11 @@ func PlayerHasTopStoneAt(stones []*LogicalCoordinate, player int, pointIndex int
 
 // Tasin oynayacagi PointIndex bos mu, ya da rakibin sadece 1 pulu mu var ?
 func CanMoveToPoint(stones []*LogicalCoordinate, player int, toPointIndex int) bool {
+	// 24 = OffBoard (toplama alanı), buralara doğrudan gidilebilir
+	if toPointIndex == 24 {
+		return true
+	}
+
 	//Tasin oynanacagi yerde rakip tas var mi ve en fazla 1 tane mi ?
 	opponentCount := CountOpponentStonesAtPoint(stones, player, toPointIndex)
 
@@ -179,6 +198,10 @@ func CanMoveToPoint(stones []*LogicalCoordinate, player int, toPointIndex int) b
 
 // Rakip oyuncunun belirtilen noktada (PointIndex) kac tasi var onu hesaplar..
 func CountOpponentStonesAtPoint(stones []*LogicalCoordinate, player int, pointIndex int) int {
+	if pointIndex == 24 {
+		return 0 // Toplanmış taşlar oyun dışında
+	}
+
 	count := 0
 	for _, stone := range stones {
 		if stone.PointIndex == pointIndex && stone.Player != player {
@@ -487,6 +510,11 @@ func UpdateStacks_Old(stones []*LogicalCoordinate, pointsToUpdate []int) []*Logi
 func UpdateStacks(stones []*LogicalCoordinate, pointsToUpdate []int) []*LogicalCoordinate {
 	// pointsToUpdate'deki her nokta için işlemi yap
 	for _, pointIndex := range pointsToUpdate {
+		// 24 (OffBoard) için stack güncellemesi yapma
+		if pointIndex == 24 {
+			continue
+		}
+
 		// İlgili noktadaki taşları filtrele
 		group := []*LogicalCoordinate{}
 		for _, stone := range stones {
@@ -611,4 +639,125 @@ func GetPossibleMovePoints(
 	}
 
 	return possiblePoints
+}
+func getBearoffRangeForPlayer(player int) []int {
+	if player == 1 {
+		return []int{18, 19, 20, 21, 22, 23}
+	}
+	return []int{0, 1, 2, 3, 4, 5}
+}
+
+// Toplamak icin tum taslar olmasi gereken yerde mi ?
+func AreAllStonesInBearOffArea(stones []*LogicalCoordinate, player int) bool {
+	bearOffRange := getBearoffRangeForPlayer(player)
+
+	pointSet := make(map[int]bool)
+	for _, p := range bearOffRange {
+		pointSet[p] = true
+	}
+
+	for _, s := range stones {
+		if s.Player != player {
+			continue
+		}
+
+		// Toplanmış taş (PointIndex == 24) her zaman geçerli
+		if s.PointIndex == 24 {
+			continue
+		}
+
+		//Kirik tasi varsa toplama yapilamaz
+		if s.PointIndex == -1 {
+			return false
+		}
+
+		if !pointSet[s.PointIndex] {
+			return false
+		}
+	}
+	return true
+}
+
+func removeDieAtIndex(dice []int, index int) []int {
+	return append(append([]int{}, dice[:index]...), dice[index+1:]...)
+}
+
+// Bu Fonksiyonun sonrasinda => "MoveTopStoneAndUpdate(stones, player, fromIndex, 24)" tasi toplamak icin cagrilir...
+func CanBearOffStone(stones []*LogicalCoordinate, player int, pointIndex int, dice []int) (result bool, remainingDice []int, usedDice []int) {
+	// 1. Tüm taşlar Player icin toplama alanında mı?
+	if !AreAllStonesInBearOffArea(stones, player) {
+		return false, dice, nil
+	}
+
+	//Gerek yok ama gene de koydum..
+	// 2. Toplama alanı dışında bir taş işaretlenmişse izin verilmez
+	bearOffRange := getBearoffRangeForPlayer(player)
+	if !slices.Contains(bearOffRange, pointIndex) {
+		return false, dice, nil
+	}
+
+	// 3. İlgili noktada oyuncunun top taşı var mı?
+	if !PlayerHasTopStoneAt(stones, player, pointIndex) {
+		return false, dice, nil
+	}
+
+	// Mesafe hesabı => Zar karsiligi
+	var distance int
+	if player == 1 {
+		distance = 23 - pointIndex + 1
+	} else {
+		distance = pointIndex + 1
+	}
+
+	// En küçük geçerli zarı bul
+	for i, die := range dice {
+		if die == distance {
+			// Tam zarla çıkabilir
+			remaining := removeDieAtIndex(dice, i)
+			return true, remaining, []int{die}
+		}
+	}
+
+	// Daha büyük zar var mı? Atilan zardan ornek 4'den daha geride 5-6'da tas var mi diye bakilir..
+	for i, die := range dice {
+		if die > distance {
+			// Daha geride taş var mı kontrol et
+			for _, s := range stones {
+				if s.Player != player || s.PointIndex == 24 || s.PointIndex == pointIndex {
+					continue
+				}
+				if player == 1 && s.PointIndex < pointIndex {
+					return false, dice, nil
+				}
+				if player == 2 && s.PointIndex > pointIndex {
+					return false, dice, nil
+				}
+			}
+			remaining := removeDieAtIndex(dice, i)
+			return true, remaining, []int{die}
+		}
+	}
+
+	return false, dice, nil
+}
+
+func IsFinishedForPlayer(stones []*LogicalCoordinate, player int) bool {
+	for _, s := range stones {
+		if s.Player == player && s.PointIndex != 24 {
+			return false
+		}
+	}
+	return true
+}
+func IsFinishedForPlayer_MoreCheck(stones []*LogicalCoordinate, player int) bool {
+	count := 0
+	for _, s := range stones {
+		if s.Player == player {
+			if s.PointIndex != 24 {
+				return false
+			}
+			count++
+		}
+	}
+	return count == 15 // Tavlada bir oyuncunun 15 taşı vardır
 }
