@@ -300,7 +300,7 @@ func IsBarEntryAllowed(stones []*LogicalCoordinate, player int, dice []int) mode
 
 		//Kullanilmayan geride kalan zarlar hesaplanir
 		if canEnter && len(enterableDice) > 0 {
-			result.RemainingDice = CalculateRemainingDice(dice, enterableDice)
+			result.RemainingDice = calculateRemainingDice(dice, enterableDice)
 		} else {
 			result.RemainingDice = dice // veya boş liste []int{}, tercihe göre
 		}
@@ -432,7 +432,7 @@ func IsNormalMoveAllowed(stones []*LogicalCoordinate, player int, fromPointIndex
 
 	//Kullanilip geride kalan kullanilmamis zarlar burada tanimlanir.
 	if canMove && len(usedDie) > 0 {
-		result.RemainingDice = CalculateRemainingDice(dice, usedDie)
+		result.RemainingDice = calculateRemainingDice(dice, usedDie)
 		result.UsedDice = usedDie
 	} else {
 		result.RemainingDice = dice
@@ -591,7 +591,7 @@ func ExpandDice(dice []int) []int {
 
 // Zarlardan ise yararlar kullanildiktan sonra geri kalan zarlar..
 // dice = [4,4,4,4], used = [4,4,4] → kalan: [4]
-func CalculateRemainingDice(dice []int, used []int) []int {
+func calculateRemainingDice(dice []int, used []int) []int {
 	remaining := make([]int, len(dice))
 	copy(remaining, dice)
 
@@ -609,7 +609,7 @@ func CalculateRemainingDice(dice []int, used []int) []int {
 }
 
 // Oynanabilir zarlara gore belirlenen PointIndex'deki tas ile gidilebilecek PointIndexler yani hamleler hesaplanir.
-func GetPossibleMovePoints(
+func GetPossibleMovePoints_old(
 	stones []*LogicalCoordinate,
 	player int,
 	fromPointIndex int,
@@ -640,6 +640,314 @@ func GetPossibleMovePoints(
 
 	return possiblePoints
 }
+
+// Oynanabilir zarlara gore belirlenen PointIndex'deki tas ile gidilebilecek PointIndexler yani hamleler hesaplanir.
+func GetPossibleMovePoints_Old2(
+	stones []*LogicalCoordinate,
+	player int,
+	fromPointIndex int,
+	dice []int,
+) []int {
+	direction := 1
+	if player == 2 {
+		direction = -1
+	}
+
+	resultSet := make(map[int]bool)
+
+	if !PlayerHasTopStoneAt(stones, player, fromPointIndex) {
+		return nil
+	}
+
+	// Tek zarla
+	for _, d := range dice {
+		to := fromPointIndex + direction*d
+		if to >= 0 && to < 24 && CanMoveToPoint(stones, player, to) {
+			resultSet[to] = true
+		}
+	}
+
+	// İki farklı zarla (normal zar)
+	if len(dice) == 2 {
+		d1, d2 := dice[0], dice[1]
+
+		// d1 sonra d2
+		intermediate1 := fromPointIndex + direction*d1
+		final1 := intermediate1 + direction*d2
+		if CanMoveToPoint(stones, player, intermediate1) &&
+			final1 >= 0 && final1 < 24 &&
+			CanMoveToPoint(stones, player, final1) {
+			resultSet[final1] = true
+		}
+
+		// d2 sonra d1
+		intermediate2 := fromPointIndex + direction*d2
+		final2 := intermediate2 + direction*d1
+		if CanMoveToPoint(stones, player, intermediate2) &&
+			final2 >= 0 && final2 < 24 &&
+			CanMoveToPoint(stones, player, final2) {
+			resultSet[final2] = true
+		}
+	}
+
+	// Double zar: 3 adım (d, d, d)
+	if len(dice) == 4 {
+		d := dice[0]
+		sum := 0
+		valid := true
+		for i := 1; i <= 3; i++ {
+			sum += d
+			intermediate := fromPointIndex + direction*sum
+			if i < 3 && !CanMoveToPoint(stones, player, intermediate) {
+				valid = false
+				break
+			}
+		}
+		final := fromPointIndex + direction*sum
+		if valid && final >= 0 && final < 24 && CanMoveToPoint(stones, player, final) {
+			resultSet[final] = true
+		}
+	}
+
+	// Double zar: 4 adım
+	if len(dice) == 4 {
+		d := dice[0]
+		sum := 0
+		valid := true
+		for i := 1; i <= 4; i++ {
+			sum += d
+			intermediate := fromPointIndex + direction*sum
+			if i < 4 && !CanMoveToPoint(stones, player, intermediate) {
+				valid = false
+				break
+			}
+		}
+		final := fromPointIndex + direction*sum
+		if valid && final >= 0 && final < 24 && CanMoveToPoint(stones, player, final) {
+			resultSet[final] = true
+		}
+	}
+
+	// Set → slice
+	var possiblePoints []int
+	for p := range resultSet {
+		possiblePoints = append(possiblePoints, p)
+	}
+
+	sort.Ints(possiblePoints)
+	return possiblePoints
+}
+func GetPossibleMovePoints_NotSupport24BearOff(
+	stones []*LogicalCoordinate,
+	player int,
+	fromPointIndex int,
+	dice []int,
+) []int {
+	direction := 1
+	if player == 2 {
+		direction = -1
+	}
+
+	resultSet := make(map[int]bool)
+
+	if !PlayerHasTopStoneAt(stones, player, fromPointIndex) {
+		return nil
+	}
+
+	// Tek zarla
+	for _, d := range dice {
+		to := fromPointIndex + direction*d
+		if to >= 0 && to < 24 && CanMoveToPoint(stones, player, to) {
+			resultSet[to] = true
+		}
+	}
+
+	// İki farklı zarla (normal zar)
+	if len(dice) == 2 {
+		d1, d2 := dice[0], dice[1]
+
+		// d1 sonra d2
+		intermediate1 := fromPointIndex + direction*d1
+		final1 := intermediate1 + direction*d2
+		if intermediate1 >= 0 && intermediate1 < 24 && CanMoveToPoint(stones, player, intermediate1) &&
+			final1 >= 0 && final1 < 24 && CanMoveToPoint(stones, player, final1) {
+			resultSet[final1] = true
+		}
+
+		// d2 sonra d1
+		intermediate2 := fromPointIndex + direction*d2
+		final2 := intermediate2 + direction*d1
+		if intermediate2 >= 0 && intermediate2 < 24 && CanMoveToPoint(stones, player, intermediate2) &&
+			final2 >= 0 && final2 < 24 && CanMoveToPoint(stones, player, final2) {
+			resultSet[final2] = true
+		}
+	}
+
+	// Double zar: 1 ila 4 adım (d, d, d, d)
+	if len(dice) == 4 && dice[0] == dice[1] && dice[1] == dice[2] && dice[2] == dice[3] {
+		d := dice[0]
+		for steps := 1; steps <= 4; steps++ {
+			valid := true
+			for i := 1; i < steps; i++ {
+				intermediate := fromPointIndex + direction*d*i
+				if intermediate < 0 || intermediate >= 24 || !CanMoveToPoint(stones, player, intermediate) {
+					valid = false
+					break
+				}
+			}
+			target := fromPointIndex + direction*d*steps
+			if valid && target >= 0 && target < 24 && CanMoveToPoint(stones, player, target) {
+				resultSet[target] = true
+			}
+		}
+	}
+
+	// Set → slice
+	var possiblePoints []int
+	for p := range resultSet {
+		possiblePoints = append(possiblePoints, p)
+	}
+
+	//Siraya dizip oyle versin
+	sort.Ints(possiblePoints)
+	return possiblePoints
+}
+
+// [24 bear off] tas playera gore toplama alani icinde ise 24 PointIndex sunulur ama tas disardan geliyor ise 24 PointIndex sunulmaz. Disardan dogrudan gelen tasin Bear Off olmasini bu functionda desteklenmiyor.
+func GetPossibleMovePoints(
+	stones []*LogicalCoordinate,
+	player int,
+	fromPointIndex int,
+	dice []int,
+) []int {
+	direction := 1
+	if player == 2 {
+		direction = -1
+	}
+
+	resultSet := make(map[int]bool)
+
+	if !PlayerHasTopStoneAt(stones, player, fromPointIndex) {
+		return nil
+	}
+
+	/*isBearOffTarget := func(to int) bool {
+		return to >= 24
+	}*/
+	isBearOffTarget := func(to int) bool {
+		if player == 1 {
+			return to >= 24
+		} else if player == 2 {
+			return to < 0
+		}
+		return false
+	}
+
+	// Tek zarla
+	for _, d := range dice {
+		to := fromPointIndex + direction*d
+		if to >= 0 && to < 24 {
+			if CanMoveToPoint(stones, player, to) {
+				resultSet[to] = true
+			}
+		} else if isBearOffTarget(to) {
+			if allowed, _, _ := CanBearOffStone(stones, player, fromPointIndex, []int{d}); allowed {
+				resultSet[24] = true
+			}
+		}
+	}
+
+	// İki farklı zarla (normal zar)
+	if len(dice) == 2 {
+		d1, d2 := dice[0], dice[1]
+
+		// d1 sonra d2
+		intermediate1 := fromPointIndex + direction*d1
+		final1 := intermediate1 + direction*d2
+		if intermediate1 >= 0 && intermediate1 < 24 && CanMoveToPoint(stones, player, intermediate1) {
+			if final1 >= 0 && final1 < 24 && CanMoveToPoint(stones, player, final1) {
+				resultSet[final1] = true
+			} else if isBearOffTarget(final1) {
+				if allowed, _, _ := CanBearOffStone(stones, player, fromPointIndex, []int{d1, d2}); allowed {
+					resultSet[24] = true
+				}
+			}
+		}
+
+		// d2 sonra d1
+		intermediate2 := fromPointIndex + direction*d2
+		final2 := intermediate2 + direction*d1
+		if intermediate2 >= 0 && intermediate2 < 24 && CanMoveToPoint(stones, player, intermediate2) {
+			if final2 >= 0 && final2 < 24 && CanMoveToPoint(stones, player, final2) {
+				resultSet[final2] = true
+			} else if isBearOffTarget(final2) {
+				if allowed, _, _ := CanBearOffStone(stones, player, fromPointIndex, []int{d2, d1}); allowed {
+					resultSet[24] = true
+				}
+			}
+		}
+	}
+
+	// Double zar: 4 adım (d, d, d, d) 1'den 4 adıma kadar
+	if len(dice) == 4 && dice[0] == dice[1] {
+		d := dice[0]
+		for steps := 1; steps <= 4; steps++ {
+			sum := d * steps
+			valid := true
+			//1, 2, 3 ve 4 adimlik tum kademeler denenir.
+			for i := 1; i < steps; i++ {
+				intermediate := fromPointIndex + direction*d*i
+				if intermediate < 0 || intermediate >= 24 || !CanMoveToPoint(stones, player, intermediate) {
+					valid = false
+					break
+				}
+			}
+			target := fromPointIndex + direction*sum
+			if valid {
+				if target >= 0 && target < 24 && CanMoveToPoint(stones, player, target) {
+					resultSet[target] = true
+				} else if isBearOffTarget(target) {
+					if allowed, _, _ := CanBearOffStone(stones, player, fromPointIndex, dice[:steps]); allowed {
+						resultSet[24] = true
+					}
+				}
+			}
+		}
+	}
+	/*if len(dice) == 4 {
+		d := dice[0]
+		sum := 0
+		valid := true
+		for i := 1; i <= 4; i++ {
+			sum += d
+			intermediate := fromPointIndex + direction*sum
+			if i < 4 && !CanMoveToPoint(stones, player, intermediate) {
+				valid = false
+				break
+			}
+		}
+		final := fromPointIndex + direction*sum
+		if valid {
+			if final >= 0 && final < 24 && CanMoveToPoint(stones, player, final) {
+				resultSet[final] = true
+			} else if isBearOffTarget(final) {
+				if allowed, _, _ := CanBearOffStone(stones, player, fromPointIndex, []int{d, d, d, d}); allowed {
+					resultSet[24] = true
+				}
+			}
+		}
+	}*/
+
+	// Set → slice
+	var possiblePoints []int
+	for p := range resultSet {
+		possiblePoints = append(possiblePoints, p)
+	}
+
+	sort.Ints(possiblePoints)
+	return possiblePoints
+}
+
 func getBearoffRangeForPlayer(player int) []int {
 	if player == 1 {
 		return []int{18, 19, 20, 21, 22, 23}
@@ -683,6 +991,8 @@ func removeDieAtIndex(dice []int, index int) []int {
 }
 
 // Bu Fonksiyonun sonrasinda => "MoveTopStoneAndUpdate(stones, player, fromIndex, 24)" tasi toplamak icin cagrilir...
+// [24 bear off] tas playera gore toplama alani icinde olmadan olmuyor. Disardan dogrudan gelen tasin Bear Off olmasini bu function desteklemiyor.
+// Tas Toplamaya Uygun mu
 func CanBearOffStone(stones []*LogicalCoordinate, player int, pointIndex int, dice []int) (result bool, remainingDice []int, usedDice []int) {
 	// 1. Tüm taşlar Player icin toplama alanında mı?
 	if !AreAllStonesInBearOffArea(stones, player) {

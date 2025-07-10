@@ -800,14 +800,14 @@ func TestPlayer2PossibleMoves(t *testing.T) {
 	t.Logf("Player 2 taşları 23 noktasından gidebileceği noktalar: %v", possibleFrom23)
 	t.Logf("Player 2 taşları 12 noktasından gidebileceği noktalar: %v", possibleFrom12)
 
-	expected := []int{20, 21}
+	expected := []int{18, 20, 21}
 	if !reflect.DeepEqual(possibleFrom23, expected) {
-		t.Fatalf("PointIndex 20 ve 21 olmasi gerekir!")
+		t.Fatalf("PointIndex 18, 20 ve 21 olmasi gerekir!")
 	}
 
-	expected2 := []int{9, 10}
+	expected2 := []int{7, 9, 10}
 	if !reflect.DeepEqual(possibleFrom12, expected2) {
-		t.Fatalf("PointIndex 9 ve 10 olmasi gerekir!")
+		t.Fatalf("PointIndex 7, 9 ve 10 olmasi gerekir!")
 	}
 }
 
@@ -888,6 +888,85 @@ func TestPlayer1ComplexPossibleMoves(t *testing.T) {
 	expectedFrom11 := []int{16}
 	if !reflect.DeepEqual(from11, expectedFrom11) {
 		t.Fatalf("18'den 16'ya gidilebilmeli ama, bulundu: %v", from18)
+	}
+}
+
+func TestPlayer1BearOffMoves(t *testing.T) {
+	player1 := 1
+
+	var stones []*core.LogicalCoordinate
+
+	// Player 1 taşları, 22 noktasında 1 taş var ve top o
+	for i := 0; i < 1; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex: 22,
+			Player:     player1,
+			IsTop:      true,
+		})
+	}
+	// Player 2 taşları, 18 noktasında 1 taş var ve top o
+	for i := 0; i < 1; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex: 18,
+			Player:     2,
+			IsTop:      true,
+		})
+	}
+
+	dice := []int{1, 5}
+
+	possibleMoves := core.GetPossibleMovePoints(stones, player1, 22, dice)
+	t.Logf("Player 1 taşları 22 noktasından gidebileceği noktalar: %v", possibleMoves)
+
+	expected := []int{23, 24} // 23 normal, 24 bear off
+
+	if !reflect.DeepEqual(possibleMoves, expected) {
+		t.Fatalf("Beklenen hareketler %v iken, bulunan hareketler %v", expected, possibleMoves)
+	}
+
+	dice = core.ExpandDice([]int{6, 6})
+
+	possibleMoves2 := core.GetPossibleMovePoints(stones, 2, 18, dice)
+	t.Logf("Player 2 taşları 18 noktasından gidebileceği noktalar: %v", possibleMoves2)
+
+	expected2 := []int{0, 6, 12} // 12, 6, 0 normal, [24 bear off] tas iceride olmadan olmuyor. Disardan dogrudan gelen tasin Bear Off olmasi icin "CanBearOffStone()" komple degismesi lazim
+
+	if !reflect.DeepEqual(possibleMoves2, expected2) {
+		t.Fatalf("Beklenen hareketler %v iken, bulunan hareketler %v", expected2, possibleMoves2)
+	}
+}
+
+func TestPlayer2PossibleMoveForThreeDice(t *testing.T) {
+	player2 := 2
+
+	var stones []*core.LogicalCoordinate
+
+	// Player 2 taşları, 22 noktasında 5 taş var ve top o
+	for i := 0; i < 5; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex: 12,
+			Player:     player2,
+			IsTop:      i == 4,
+		})
+	}
+	// Player 1 taşları, 4 noktasında 2 taş var ve top o
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{
+			PointIndex: 4,
+			Player:     1,
+			IsTop:      i == 1,
+		})
+	}
+
+	dice := core.ExpandDice([]int{2, 2})
+
+	possibleMoves := core.GetPossibleMovePoints(stones, player2, 12, dice)
+	t.Logf("Player 2 taşları 12 noktasından gidebileceği noktalar: %v", possibleMoves)
+
+	expected := []int{6, 8, 10}
+
+	if !reflect.DeepEqual(possibleMoves, expected) {
+		t.Fatalf("Beklenen hareketler %v iken, bulunan hareketler %v", expected, possibleMoves)
 	}
 }
 
