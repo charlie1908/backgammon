@@ -91,15 +91,15 @@ func SortStonesByPlayerPointAndStackAsc(stones []*LogicalCoordinate) {
 // Taşı hedef noktaya taşır ve MoveOrder günceller.
 // Sadece taşın eski ve yeni noktalarındaki taşlar güncellenir.
 
-// 1-) Kirik tasi var mi "IsBarEntryAllowed()" ve Taslar istenen PointIndex'e hareket edebiliyor mu "IsNormalMoveAllowed()" bakildiktan sonra cagrilir.
+// 1-) Kirik tasi var mi "IsAllBarEntryAllowed()" ve Taslar istenen PointIndex'e hareket edebiliyor mu "IsNormalMoveAllowed()" bakildiktan sonra cagrilir.
 // 2-) Taslarin PointIndexlerini gercekten yer degistirerek ayrica ayrildigi ve tasindigi guruplarin Stackindexlerini degistirerek taslari gerckten hareket ettirir.
 // 3-) Arada rakibin kirilan tasi var ise kirar..
 func MoveTopStoneAndUpdate(stones []*LogicalCoordinate, player int, fromPointIndex int, toPointIndex int) ([]*LogicalCoordinate, bool) {
 
-	//Normalde IsBarEntryAllowed(), IsNormalMoveAllowed() functionlari bu Methodun basinda cagrilip bakilmali. Ama gene de bir ekstra 3 kontrol koyma ihtiyaci duydum.
+	//Normalde IsAllBarEntryAllowed(), IsNormalMoveAllowed() functionlari bu Methodun basinda cagrilip bakilmali. Ama gene de bir ekstra 3 kontrol koyma ihtiyaci duydum.
 
 	// 1. Gecerli oyuncun belirtilen yerde en ustte tasi var mi ?
-	if !PlayerHasTopStoneAt(stones, player, fromPointIndex) {
+	if !playerHasTopStoneAt(stones, player, fromPointIndex) {
 		return stones, false // Oyuncunun bu noktada üstte taşı yok, hareket edemez
 	}
 
@@ -114,12 +114,12 @@ func MoveTopStoneAndUpdate(stones []*LogicalCoordinate, player int, fromPointInd
 	if toPointIndex != 24 {
 		//Karsi rakibin birden fazla tasi var mi ? ilgili PointIndex'inde..
 		// 3. Hedef nokta rakip tarafindan blokaj altinda mi ?
-		if !CanMoveToPoint(stones, player, toPointIndex) {
+		if !canMoveToPoint(stones, player, toPointIndex) {
 			return stones, false // Hareket yasak
 		}
 
 		// 💥 Kırma kontrolü — hedef noktada 1 adet rakip taşı varsa kır ve bar'a gönder
-		if CountOpponentStonesAtPoint(stones, player, toPointIndex) == 1 {
+		if countOpponentStonesAtPoint(stones, player, toPointIndex) == 1 {
 			for i, stone := range stones {
 				if stone.PointIndex == toPointIndex && stone.Player != player {
 					stones[i].PointIndex = -1
@@ -132,7 +132,7 @@ func MoveTopStoneAndUpdate(stones []*LogicalCoordinate, player int, fromPointInd
 					break
 				}
 			}
-			stones = UpdateStacks(stones, []int{-1}) // Bar'daki taşların stack bilgisi güncellenir
+			stones = updateStacks(stones, []int{-1}) // Bar'daki taşların stack bilgisi güncellenir
 		}
 	}
 	var moveIndex int = -1
@@ -162,13 +162,13 @@ func MoveTopStoneAndUpdate(stones []*LogicalCoordinate, player int, fromPointInd
 	stones[moveIndex].MoveOrder = globalMoveOrder
 
 	// StackIndex Güncellemelerini yap
-	stones = UpdateStacks(stones, []int{oldPointIndex, toPointIndex})
+	stones = updateStacks(stones, []int{oldPointIndex, toPointIndex})
 
 	return stones, true
 }
 
 // Oynayacak Player'in belirtilen from noktasindaki taş dilimlerinde en üstte taşa sahip olup olmadığını kontrol eder.
-func PlayerHasTopStoneAt(stones []*LogicalCoordinate, player int, pointIndex int) bool {
+func playerHasTopStoneAt(stones []*LogicalCoordinate, player int, pointIndex int) bool {
 	if pointIndex == 24 {
 		return false // offboard'daki taşlar zaten üstte olamaz, oynanamaz
 	}
@@ -182,14 +182,14 @@ func PlayerHasTopStoneAt(stones []*LogicalCoordinate, player int, pointIndex int
 }
 
 // Tasin oynayacagi PointIndex bos mu, ya da rakibin sadece 1 pulu mu var ?
-func CanMoveToPoint(stones []*LogicalCoordinate, player int, toPointIndex int) bool {
+func canMoveToPoint(stones []*LogicalCoordinate, player int, toPointIndex int) bool {
 	// 24 = OffBoard (toplama alanı), buralara doğrudan gidilebilir
 	if toPointIndex == 24 {
 		return true
 	}
 
 	//Tasin oynanacagi yerde rakip tas var mi ve en fazla 1 tane mi ?
-	opponentCount := CountOpponentStonesAtPoint(stones, player, toPointIndex)
+	opponentCount := countOpponentStonesAtPoint(stones, player, toPointIndex)
 
 	// Eğer rakip taş sayısı 0 veya 1 ise hareket mümkün
 	// 2 veya daha fazla rakip taş varsa hareket yasak
@@ -197,7 +197,7 @@ func CanMoveToPoint(stones []*LogicalCoordinate, player int, toPointIndex int) b
 }
 
 // Rakip oyuncunun belirtilen noktada (PointIndex) kac tasi var onu hesaplar..
-func CountOpponentStonesAtPoint(stones []*LogicalCoordinate, player int, pointIndex int) int {
+func countOpponentStonesAtPoint(stones []*LogicalCoordinate, player int, pointIndex int) int {
 	if pointIndex == 24 {
 		return 0 // Toplanmış taşlar oyun dışında
 	}
@@ -229,7 +229,7 @@ func PlayerMustEnterFromBar(stones []*LogicalCoordinate, player int) bool {
 		if entryPoint < 0 || entryPoint > 23 {
 			continue
 		}
-		if CanMoveToPoint(stones, player, entryPoint) {
+		if canMoveToPoint(stones, player, entryPoint) {
 			enterableDice = append(enterableDice, die)
 		}
 	}
@@ -237,6 +237,7 @@ func PlayerMustEnterFromBar(stones []*LogicalCoordinate, player int) bool {
 }*/
 
 // Kirik butun taslari girebilecek mi? Girerse hangi zar veya zarlar ile girilebilecek. Double(Cift) zar destegi icin ExpandDice() function kullan..
+// Her bir kırık taş için zar bulabilir miyim?
 func CanAllBarStonesEnter(stones []*LogicalCoordinate, player int, dice []int) (bool, []int) {
 	var usedDice []int
 	remainingDice := append([]int(nil), dice...) // Zarları kopyala
@@ -258,7 +259,7 @@ func CanAllBarStonesEnter(stones []*LogicalCoordinate, player int, dice []int) (
 		found := false
 		for j, die := range remainingDice {
 			entryPoint := GetEntryPoint(player, die)
-			if CanMoveToPoint(stones, player, entryPoint) {
+			if canMoveToPoint(stones, player, entryPoint) {
 				usedDice = append(usedDice, die) //Ise yarar zar, kirik bir tas icin kullanilir.
 				// Bu zarı kullan, listeden çıkar
 				remainingDice = append(remainingDice[:j], remainingDice[j+1:]...)
@@ -274,6 +275,17 @@ func CanAllBarStonesEnter(stones []*LogicalCoordinate, player int, dice []int) (
 	return true, usedDice // Her taş için zar bulundu
 }
 
+// Kirik taslari girebilecegin TUM zarlari geri doner.
+func GetEnterableBarDice(stones []*LogicalCoordinate, player int, dice []int) (enterableDice []int) {
+	for _, die := range dice {
+		entryPoint := GetEntryPoint(player, die)
+		if canMoveToPoint(stones, player, entryPoint) {
+			enterableDice = append(enterableDice, die)
+		}
+	}
+	return
+}
+
 // Player'a gore atilan zarin, tavlada PontIndex karsiligi bulunur.
 // PointIndex 0'dan baslar zarlarin PointIndex karsiligi (-1) 1 eksigidir.
 func GetEntryPoint(player int, die int) int {
@@ -286,13 +298,48 @@ func GetEntryPoint(player int, die int) int {
 }
 
 // Önce bar girişi kontrol edilir. Kirik tas var mi ?
-func IsBarEntryAllowed(stones []*LogicalCoordinate, player int, dice []int) models.MoveCheckResult {
+// Tum kiriklar girilebiliyor mu ve kullanilmayan zarlar hangisi
+// Tum kiriklar girilmez ise Allowed ve CanEnterFromBar = false olur..
+func IsAllBarEntryAllowed(stones []*LogicalCoordinate, player int, dice []int) models.MoveCheckResult {
 	result := models.MoveCheckResult{}
 
 	if PlayerMustEnterFromBar(stones, player) {
 		result.FromBar = true
 		//canEnter, enterableDice := CanEnterFromBar(stones, player, dice)
-		canEnter, enterableDice := CanAllBarStonesEnter(stones, player, dice)
+		canEnter, enterableDice := CanAllBarStonesEnter(stones, player, dice) // Burada kirigi iceri sokabilen sadece ilk bulunan zarlar her bir kirik icin bulunup butun taslar girilebiliyor mu ve geride kalan kullanilmayan zarlar hangisi diye bakiliyor.
+
+		result.CanEnterFromBar = canEnter
+		result.EnterableDice = enterableDice
+		result.UsedDice = enterableDice
+		result.Allowed = canEnter
+
+		//Kullanilmayan geride kalan zarlar hesaplanir
+		if canEnter && len(enterableDice) > 0 {
+			result.RemainingDice = calculateRemainingDice(dice, enterableDice)
+		} else {
+			result.RemainingDice = dice // veya boş liste []int{}, tercihe göre
+		}
+
+		return result
+	}
+
+	// Bar’da taş yok, izin yok demiyoruz, sadece bar durumu değil. Yani Kirik tasi yok..
+	result.FromBar = false
+	//result.Allowed = false
+	result.Allowed = true
+	result.RemainingDice = dice
+	return result
+}
+
+// Önce bar girişi kontrol edilir. Kirik tas var mi ? Varsa kirigi iceri sokabilen tum zarlar ve hicbir kirigi iceri sokamayan zarlar belirlenir.
+func IsAnyBarEntryAllowed(stones []*LogicalCoordinate, player int, dice []int) models.MoveCheckResult {
+	result := models.MoveCheckResult{}
+
+	if PlayerMustEnterFromBar(stones, player) {
+		result.FromBar = true
+		enterableDice := GetEnterableBarDice(stones, player, dice) //Kirik veya kiriklari iceri sokabilecek tum zarlar geri donulur. RemaningDice ile hicbir kirigi iceri sokamayan zarlar belli olur.
+		canEnter := len(enterableDice) > 0
+
 		result.CanEnterFromBar = canEnter
 		result.EnterableDice = enterableDice
 		result.UsedDice = enterableDice
@@ -320,7 +367,7 @@ func IsNormalMoveAllowed_Old(stones []*LogicalCoordinate, player int, fromPointI
 	result := models.MoveCheckResult{}
 
 	// Normal hamle kontrolü
-	canMove := CanMoveToPoint(stones, player, toPointIndex)
+	canMove := canMoveToPoint(stones, player, toPointIndex)
 	if canMove {
 		result.CanMoveNormally = true
 		result.NormalDice = dice // opsiyonel: zar mesafesiyle uyum kontrolü yapılabilir
@@ -359,7 +406,7 @@ func IsNormalMoveAllowed(stones []*LogicalCoordinate, player int, fromPointIndex
 	// Tek zarla hareket kontrolü sadece mesafe 6 veya daha küçükse yapılır
 	if distance <= 6 {
 		for _, d := range dice {
-			if d == distance && CanMoveToPoint(stones, player, fromPointIndex+direction*d) {
+			if d == distance && canMoveToPoint(stones, player, fromPointIndex+direction*d) {
 				canMove = true
 				usedDie = []int{d}
 				break
@@ -374,7 +421,7 @@ func IsNormalMoveAllowed(stones []*LogicalCoordinate, player int, fromPointIndex
 		// Önce d1 sonra d2 ile hareket dene
 		posAfterFirst := fromPointIndex + direction*d1
 		posAfterSecond := posAfterFirst + direction*d2
-		if CanMoveToPoint(stones, player, posAfterFirst) && CanMoveToPoint(stones, player, posAfterSecond) && posAfterSecond == toPointIndex {
+		if canMoveToPoint(stones, player, posAfterFirst) && canMoveToPoint(stones, player, posAfterSecond) && posAfterSecond == toPointIndex {
 			usedDie = []int{d1, d2}
 			canMove = true
 		}
@@ -383,7 +430,7 @@ func IsNormalMoveAllowed(stones []*LogicalCoordinate, player int, fromPointIndex
 			// Önce d2 sonra d1 ile hareket dene
 			posAfterFirst = fromPointIndex + direction*d2
 			posAfterSecond = posAfterFirst + direction*d1
-			if CanMoveToPoint(stones, player, posAfterFirst) && CanMoveToPoint(stones, player, posAfterSecond) && posAfterSecond == toPointIndex {
+			if canMoveToPoint(stones, player, posAfterFirst) && canMoveToPoint(stones, player, posAfterSecond) && posAfterSecond == toPointIndex {
 				usedDie = []int{d1, d2}
 				canMove = true
 			}
@@ -399,12 +446,12 @@ func IsNormalMoveAllowed(stones []*LogicalCoordinate, player int, fromPointIndex
 			sum += dice[0] // hepsi aynı zar (double) olduğu için dice[0]
 			intermediate := fromPointIndex + direction*sum
 
-			if i < 3 && !CanMoveToPoint(stones, player, intermediate) { // ara noktalar engelli mi?
+			if i < 3 && !canMoveToPoint(stones, player, intermediate) { // ara noktalar engelli mi?
 				canReach = false
 				break
 			}
 		}
-		if canReach && (fromPointIndex+direction*sum) == toPointIndex && CanMoveToPoint(stones, player, toPointIndex) {
+		if canReach && (fromPointIndex+direction*sum) == toPointIndex && canMoveToPoint(stones, player, toPointIndex) {
 			usedDie = []int{dice[0], dice[1], dice[2]} // ilk 3 zar kullanıldı
 			canMove = true
 		}
@@ -418,12 +465,12 @@ func IsNormalMoveAllowed(stones []*LogicalCoordinate, player int, fromPointIndex
 			intermediate := fromPointIndex + direction*sum
 
 			// Ara noktalarda rakip taşlar varsa hareket geçersiz
-			if i < 4 && !CanMoveToPoint(stones, player, intermediate) {
+			if i < 4 && !canMoveToPoint(stones, player, intermediate) {
 				break
 			}
 
 			// Dördüncü adımda hedefe ulaşılmış ve taş konulabilir mi?
-			if i == 4 && intermediate == toPointIndex && CanMoveToPoint(stones, player, toPointIndex) {
+			if i == 4 && intermediate == toPointIndex && canMoveToPoint(stones, player, toPointIndex) {
 				usedDie = []int{dice[0], dice[1], dice[2], dice[3]} // ya da 4x dice[0]
 				canMove = true
 			}
@@ -507,7 +554,7 @@ func UpdateStacks_Old(stones []*LogicalCoordinate, pointsToUpdate []int) []*Logi
 }
 
 // Sadece verilen noktaların taşlarını günceller. Hem PointIndex hem de StackIndex guncellenir.
-func UpdateStacks(stones []*LogicalCoordinate, pointsToUpdate []int) []*LogicalCoordinate {
+func updateStacks(stones []*LogicalCoordinate, pointsToUpdate []int) []*LogicalCoordinate {
 	// pointsToUpdate'deki her nokta için işlemi yap
 	for _, pointIndex := range pointsToUpdate {
 		// 24 (OffBoard) için stack güncellemesi yapma
@@ -622,7 +669,7 @@ func GetPossibleMovePoints_old(
 
 	var possiblePoints []int
 
-	if !PlayerHasTopStoneAt(stones, player, fromPointIndex) {
+	if !playerHasTopStoneAt(stones, player, fromPointIndex) {
 		return possiblePoints
 	}
 
@@ -633,7 +680,7 @@ func GetPossibleMovePoints_old(
 			continue
 		}
 
-		if CanMoveToPoint(stones, player, toPointIndex) {
+		if canMoveToPoint(stones, player, toPointIndex) {
 			possiblePoints = append(possiblePoints, toPointIndex)
 		}
 	}
@@ -655,14 +702,14 @@ func GetPossibleMovePoints_Old2(
 
 	resultSet := make(map[int]bool)
 
-	if !PlayerHasTopStoneAt(stones, player, fromPointIndex) {
+	if !playerHasTopStoneAt(stones, player, fromPointIndex) {
 		return nil
 	}
 
 	// Tek zarla
 	for _, d := range dice {
 		to := fromPointIndex + direction*d
-		if to >= 0 && to < 24 && CanMoveToPoint(stones, player, to) {
+		if to >= 0 && to < 24 && canMoveToPoint(stones, player, to) {
 			resultSet[to] = true
 		}
 	}
@@ -674,18 +721,18 @@ func GetPossibleMovePoints_Old2(
 		// d1 sonra d2
 		intermediate1 := fromPointIndex + direction*d1
 		final1 := intermediate1 + direction*d2
-		if CanMoveToPoint(stones, player, intermediate1) &&
+		if canMoveToPoint(stones, player, intermediate1) &&
 			final1 >= 0 && final1 < 24 &&
-			CanMoveToPoint(stones, player, final1) {
+			canMoveToPoint(stones, player, final1) {
 			resultSet[final1] = true
 		}
 
 		// d2 sonra d1
 		intermediate2 := fromPointIndex + direction*d2
 		final2 := intermediate2 + direction*d1
-		if CanMoveToPoint(stones, player, intermediate2) &&
+		if canMoveToPoint(stones, player, intermediate2) &&
 			final2 >= 0 && final2 < 24 &&
-			CanMoveToPoint(stones, player, final2) {
+			canMoveToPoint(stones, player, final2) {
 			resultSet[final2] = true
 		}
 	}
@@ -698,13 +745,13 @@ func GetPossibleMovePoints_Old2(
 		for i := 1; i <= 3; i++ {
 			sum += d
 			intermediate := fromPointIndex + direction*sum
-			if i < 3 && !CanMoveToPoint(stones, player, intermediate) {
+			if i < 3 && !canMoveToPoint(stones, player, intermediate) {
 				valid = false
 				break
 			}
 		}
 		final := fromPointIndex + direction*sum
-		if valid && final >= 0 && final < 24 && CanMoveToPoint(stones, player, final) {
+		if valid && final >= 0 && final < 24 && canMoveToPoint(stones, player, final) {
 			resultSet[final] = true
 		}
 	}
@@ -717,13 +764,13 @@ func GetPossibleMovePoints_Old2(
 		for i := 1; i <= 4; i++ {
 			sum += d
 			intermediate := fromPointIndex + direction*sum
-			if i < 4 && !CanMoveToPoint(stones, player, intermediate) {
+			if i < 4 && !canMoveToPoint(stones, player, intermediate) {
 				valid = false
 				break
 			}
 		}
 		final := fromPointIndex + direction*sum
-		if valid && final >= 0 && final < 24 && CanMoveToPoint(stones, player, final) {
+		if valid && final >= 0 && final < 24 && canMoveToPoint(stones, player, final) {
 			resultSet[final] = true
 		}
 	}
@@ -750,14 +797,14 @@ func GetPossibleMovePoints_NotSupport24BearOff(
 
 	resultSet := make(map[int]bool)
 
-	if !PlayerHasTopStoneAt(stones, player, fromPointIndex) {
+	if !playerHasTopStoneAt(stones, player, fromPointIndex) {
 		return nil
 	}
 
 	// Tek zarla
 	for _, d := range dice {
 		to := fromPointIndex + direction*d
-		if to >= 0 && to < 24 && CanMoveToPoint(stones, player, to) {
+		if to >= 0 && to < 24 && canMoveToPoint(stones, player, to) {
 			resultSet[to] = true
 		}
 	}
@@ -769,16 +816,16 @@ func GetPossibleMovePoints_NotSupport24BearOff(
 		// d1 sonra d2
 		intermediate1 := fromPointIndex + direction*d1
 		final1 := intermediate1 + direction*d2
-		if intermediate1 >= 0 && intermediate1 < 24 && CanMoveToPoint(stones, player, intermediate1) &&
-			final1 >= 0 && final1 < 24 && CanMoveToPoint(stones, player, final1) {
+		if intermediate1 >= 0 && intermediate1 < 24 && canMoveToPoint(stones, player, intermediate1) &&
+			final1 >= 0 && final1 < 24 && canMoveToPoint(stones, player, final1) {
 			resultSet[final1] = true
 		}
 
 		// d2 sonra d1
 		intermediate2 := fromPointIndex + direction*d2
 		final2 := intermediate2 + direction*d1
-		if intermediate2 >= 0 && intermediate2 < 24 && CanMoveToPoint(stones, player, intermediate2) &&
-			final2 >= 0 && final2 < 24 && CanMoveToPoint(stones, player, final2) {
+		if intermediate2 >= 0 && intermediate2 < 24 && canMoveToPoint(stones, player, intermediate2) &&
+			final2 >= 0 && final2 < 24 && canMoveToPoint(stones, player, final2) {
 			resultSet[final2] = true
 		}
 	}
@@ -790,13 +837,13 @@ func GetPossibleMovePoints_NotSupport24BearOff(
 			valid := true
 			for i := 1; i < steps; i++ {
 				intermediate := fromPointIndex + direction*d*i
-				if intermediate < 0 || intermediate >= 24 || !CanMoveToPoint(stones, player, intermediate) {
+				if intermediate < 0 || intermediate >= 24 || !canMoveToPoint(stones, player, intermediate) {
 					valid = false
 					break
 				}
 			}
 			target := fromPointIndex + direction*d*steps
-			if valid && target >= 0 && target < 24 && CanMoveToPoint(stones, player, target) {
+			if valid && target >= 0 && target < 24 && canMoveToPoint(stones, player, target) {
 				resultSet[target] = true
 			}
 		}
@@ -827,7 +874,7 @@ func GetPossibleMovePoints(
 
 	resultSet := make(map[int]bool)
 
-	if !PlayerHasTopStoneAt(stones, player, fromPointIndex) {
+	if !playerHasTopStoneAt(stones, player, fromPointIndex) {
 		return nil
 	}
 
@@ -847,7 +894,7 @@ func GetPossibleMovePoints(
 	for _, d := range dice {
 		to := fromPointIndex + direction*d
 		if to >= 0 && to < 24 {
-			if CanMoveToPoint(stones, player, to) {
+			if canMoveToPoint(stones, player, to) {
 				resultSet[to] = true
 			}
 		} else if isBearOffTarget(to) {
@@ -864,8 +911,8 @@ func GetPossibleMovePoints(
 		// d1 sonra d2
 		intermediate1 := fromPointIndex + direction*d1
 		final1 := intermediate1 + direction*d2
-		if intermediate1 >= 0 && intermediate1 < 24 && CanMoveToPoint(stones, player, intermediate1) {
-			if final1 >= 0 && final1 < 24 && CanMoveToPoint(stones, player, final1) {
+		if intermediate1 >= 0 && intermediate1 < 24 && canMoveToPoint(stones, player, intermediate1) {
+			if final1 >= 0 && final1 < 24 && canMoveToPoint(stones, player, final1) {
 				resultSet[final1] = true
 			} else if isBearOffTarget(final1) {
 				if allowed, _, _ := CanBearOffStone(stones, player, fromPointIndex, []int{d1, d2}); allowed {
@@ -877,8 +924,8 @@ func GetPossibleMovePoints(
 		// d2 sonra d1
 		intermediate2 := fromPointIndex + direction*d2
 		final2 := intermediate2 + direction*d1
-		if intermediate2 >= 0 && intermediate2 < 24 && CanMoveToPoint(stones, player, intermediate2) {
-			if final2 >= 0 && final2 < 24 && CanMoveToPoint(stones, player, final2) {
+		if intermediate2 >= 0 && intermediate2 < 24 && canMoveToPoint(stones, player, intermediate2) {
+			if final2 >= 0 && final2 < 24 && canMoveToPoint(stones, player, final2) {
 				resultSet[final2] = true
 			} else if isBearOffTarget(final2) {
 				if allowed, _, _ := CanBearOffStone(stones, player, fromPointIndex, []int{d2, d1}); allowed {
@@ -897,14 +944,14 @@ func GetPossibleMovePoints(
 			//1, 2, 3 ve 4 adimlik tum kademeler denenir.
 			for i := 1; i < steps; i++ {
 				intermediate := fromPointIndex + direction*d*i
-				if intermediate < 0 || intermediate >= 24 || !CanMoveToPoint(stones, player, intermediate) {
+				if intermediate < 0 || intermediate >= 24 || !canMoveToPoint(stones, player, intermediate) {
 					valid = false
 					break
 				}
 			}
 			target := fromPointIndex + direction*sum
 			if valid {
-				if target >= 0 && target < 24 && CanMoveToPoint(stones, player, target) {
+				if target >= 0 && target < 24 && canMoveToPoint(stones, player, target) {
 					resultSet[target] = true
 				} else if isBearOffTarget(target) {
 					if allowed, _, _ := CanBearOffStone(stones, player, fromPointIndex, dice[:steps]); allowed {
@@ -921,14 +968,14 @@ func GetPossibleMovePoints(
 		for i := 1; i <= 4; i++ {
 			sum += d
 			intermediate := fromPointIndex + direction*sum
-			if i < 4 && !CanMoveToPoint(stones, player, intermediate) {
+			if i < 4 && !canMoveToPoint(stones, player, intermediate) {
 				valid = false
 				break
 			}
 		}
 		final := fromPointIndex + direction*sum
 		if valid {
-			if final >= 0 && final < 24 && CanMoveToPoint(stones, player, final) {
+			if final >= 0 && final < 24 && canMoveToPoint(stones, player, final) {
 				resultSet[final] = true
 			} else if isBearOffTarget(final) {
 				if allowed, _, _ := CanBearOffStone(stones, player, fromPointIndex, []int{d, d, d, d}); allowed {
@@ -1007,7 +1054,7 @@ func CanBearOffStone(stones []*LogicalCoordinate, player int, pointIndex int, di
 	}
 
 	// 3. İlgili noktada oyuncunun top taşı var mı?
-	if !PlayerHasTopStoneAt(stones, player, pointIndex) {
+	if !playerHasTopStoneAt(stones, player, pointIndex) {
 		return false, dice, nil
 	}
 
@@ -1070,4 +1117,71 @@ func IsFinishedForPlayer_MoreCheck(stones []*LogicalCoordinate, player int) bool
 		}
 	}
 	return count == 15 // Tavlada bir oyuncunun 15 taşı vardır
+}
+
+func TryMoveStone(
+	stones []*LogicalCoordinate,
+	player int,
+	fromPoint int,
+	toPoint int,
+	dice []int,
+) (newStones []*LogicalCoordinate, ok bool, usedDice []int, remainingDice []int) {
+
+	// 1. Bar'dan giriş durumu. Kirik tas var mi ?
+	if fromPoint == -1 {
+		barResult := IsAnyBarEntryAllowed(stones, player, dice) //1-) barResult.RemainingDice kullanilabilecek zarlardan sonra geri kalan kirigi sokamayacagin zarlari ifade eder.
+		if !barResult.FromBar || !barResult.Allowed {
+			return stones, false, dice, nil
+		}
+
+		// Giriş yapılabilecek zar var mı? toPoint'i kontrol etmiyoruz, zarla gelen yere giriyoruz
+		for _, die := range barResult.EnterableDice {
+			entryPoint := GetEntryPoint(player, die)
+			if entryPoint == toPoint {
+				newStones, moved := MoveTopStoneAndUpdate(stones, player, -1, entryPoint)
+				if moved {
+					used := []int{die}
+					//2-) Gercekten zar kullanilinca geri kalan zarlar burada atanir.
+					barResult.RemainingDice = calculateRemainingDice(dice, used) //Kullanilan zar tum zarlardan cikarilir.
+					return newStones, true, used, barResult.RemainingDice
+				}
+			}
+		}
+		// Uygun zar yok veya hedef uyumsuzsa. Bu turn pass gecilir. remainingDice => nil
+		return stones, false, dice, nil
+	}
+
+	// 2. Hedef toplama alanı mı?
+	isBearOff := func(to int) bool {
+		if player == 1 {
+			return to >= 24
+		} else if player == 2 {
+			return to < 0
+		}
+		return false
+	}
+
+	// 3. Oyuncunun fromPoint noktasında en üst taşı var mı?
+	if !playerHasTopStoneAt(stones, player, fromPoint) {
+		return stones, false, dice, nil
+	}
+
+	// 4. Bear-off kontrolü
+	if isBearOff(toPoint) {
+		canBearOff, remaining, used := CanBearOffStone(stones, player, fromPoint, dice)
+		if !canBearOff {
+			return stones, false, dice, nil
+		}
+		newStones, ok := MoveTopStoneAndUpdate(stones, player, fromPoint, toPoint)
+		return newStones, ok, used, remaining
+	}
+
+	// 5. Normal taş hareketi
+	moveResult := IsNormalMoveAllowed(stones, player, fromPoint, toPoint, dice)
+	if !moveResult.Allowed {
+		return stones, false, dice, nil
+	}
+
+	newStones, ok = MoveTopStoneAndUpdate(stones, player, fromPoint, toPoint)
+	return newStones, ok, moveResult.UsedDice, moveResult.RemainingDice
 }

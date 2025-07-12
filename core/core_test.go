@@ -17,7 +17,7 @@ func TestMoveTopStoneAndUpdate_ValidMove_WithConsoleOutput(t *testing.T) {
 	dice := []int{1, 2} // Zarlar
 
 	//Once kirik tasi var mi kontrolu
-	result := core.IsBarEntryAllowed(stones, player, dice)
+	result := core.IsAllBarEntryAllowed(stones, player, dice)
 
 	if result.FromBar {
 		t.Error("Bar'da taş var gozukuyor ama yok, FromBar false olmalı")
@@ -52,7 +52,7 @@ func TestMoveTopStoneAndUpdate_InvalidMove(t *testing.T) {
 	dice := []int{1, 4} // Zarlar
 
 	//Once kirik tasi var mi kontrolu
-	result := core.IsBarEntryAllowed(stones, player, dice)
+	result := core.IsAllBarEntryAllowed(stones, player, dice)
 
 	if result.FromBar {
 		t.Error("Bar'da taş var gozukuyor ama yok, FromBar false olmalı")
@@ -137,7 +137,7 @@ func TestMoveTopStoneAndUpdate_CaptureOpponentStoneAndSendToBar(t *testing.T) {
 	t.Log("----------------------------------------------")
 
 	// Önce bar'da taş var mı kontrolü
-	result := core.IsBarEntryAllowed(stones, player, dice)
+	result := core.IsAllBarEntryAllowed(stones, player, dice)
 	if result.FromBar {
 		t.Error("Bar'da taş olduğu görünüyor ama olmamalı, FromBar false olmalı")
 	}
@@ -261,7 +261,7 @@ func TestIsNormalMoveAllowed_NormalMove(t *testing.T) {
 	dice := []int{1, 2}
 
 	// Önce bar girişi kontrol edilir
-	barResult := core.IsBarEntryAllowed(stones, player, dice)
+	barResult := core.IsAllBarEntryAllowed(stones, player, dice)
 	if barResult.FromBar {
 		t.Error("Bar'da taş yok, FromBar false olmalı")
 	}
@@ -345,7 +345,7 @@ func TestIsBarEntryAllowed_PartialEntry(t *testing.T) {
 	// Entry 1: boş
 	dice := []int{1, 2}
 
-	result := core.IsBarEntryAllowed(stones, player, dice)
+	result := core.IsAllBarEntryAllowed(stones, player, dice)
 
 	if !result.FromBar {
 		t.Error("Bar'da taş var, FromBar true olmalı")
@@ -417,7 +417,7 @@ func TestIsBarEntryAllowed_NoEntryForThreeBrokenStones(t *testing.T) {
 	dice := core.ExpandDice([]int{3, 3})
 	//dice := []int{3, 3}
 
-	result := core.IsBarEntryAllowed(stones, player, dice)
+	result := core.IsAllBarEntryAllowed(stones, player, dice)
 
 	if !result.FromBar {
 		t.Error("Bar'da taş var, FromBar true olmalı")
@@ -470,7 +470,7 @@ func TestIsBarEntryAllowed_NoEntry(t *testing.T) {
 	//dice := []int{1, 1}
 	// Çift zarlar (double değil)
 	dice := core.ExpandDice([]int{1, 1})
-	result := core.IsBarEntryAllowed(stones, player, dice)
+	result := core.IsAllBarEntryAllowed(stones, player, dice)
 
 	if !result.FromBar {
 		t.Error("Bar'da taş var, FromBar true olmalı")
@@ -564,7 +564,7 @@ func TestPlayer2CannotMoveToBlockedPoint(t *testing.T) {
 	dice := []int{3, 4} // Zarlar
 
 	//Once kirik tasi var mi kontrolu
-	result := core.IsBarEntryAllowed(stones, player2, dice)
+	result := core.IsAllBarEntryAllowed(stones, player2, dice)
 
 	if result.FromBar {
 		t.Error("Bar'da taş var gozukuyor ama yok, FromBar false olmalı")
@@ -668,7 +668,7 @@ func Test_Player1_BarAndMove_WithDoubleFour(t *testing.T) {
 	expandedDice := core.ExpandDice(dice)
 
 	// 1. Bar girişine izin var mı?
-	barResult := core.IsBarEntryAllowed(stones, 1, expandedDice)
+	barResult := core.IsAllBarEntryAllowed(stones, 1, expandedDice)
 	if !barResult.FromBar {
 		t.Fatal("Bar'da kırık taş varken FromBar true olmalı")
 	}
@@ -1340,6 +1340,78 @@ func TestPlayer2CollectStonesWithBiggerDice(t *testing.T) {
 				t.Fatalf("Tum Taslar Toplanamadi")
 			}
 			t.Logf("Toplanan Tas %d", stone.PointIndex)
+		}
+	}
+}
+
+func TestTryMoveStone_FiveTurnsAlternatingPlayers(t *testing.T) {
+	stones := core.GetInitialStones()
+
+	// Örnek zarlar (her tur için player ayrı ayrı)
+	playerDice := map[int][][]int{
+		1: {
+			{3, 2},
+			{5, 1}, //Kirik Tasta 5-1 => 4'e girmeye calisacak
+			{6, 5}, //Kirik Tasi  6 -5 => 4'e girmeye calisacak 6 dolu zaten.
+			{2, 3},
+			{3, 3},
+		},
+		2: {
+			{4, 2},
+			{3, 2},
+			{1, 6},
+			{5, 3},
+			{4, 1},
+		},
+	}
+
+	// Başlangıç hamleleri (fromPoint -> toPoint) sabit, sadece örnek
+	moves := map[int][][2]int{
+		1: {
+			{0, 3},   // player 1, tur 1: 0 -> 3
+			{3, 4},   // tur 2: 3 -> 4 Kirik Tasi Var aslinda -1 => 4 [5,1] zarlar
+			{0, 4},   // tur 3: 0 -> 4 Kirik Tasi Var aslinda -1 => 4 [6,5] zarlar. 6 ile giremez 5 ile 4'e kirik tasini sokar.
+			{4, 6},   // tur 4: 10 -> 15 Player 2'nin tasini kirar.
+			{16, 19}, // tur 5: 16 -> 19
+		},
+		2: {
+			{7, 3},   // player 2, tur 1: 7 -> 3
+			{3, 0},   // tur 2: 3 -> 0 (bear off için)
+			{12, 6},  // tur 3: 12 -> 6
+			{23, 19}, // tur 4: 23 -> 19 Kirik tasi var -1 => 19 [5,3] zarlar ile 5 ile 19'a kirik tasini sokar.
+			{-1, 23}, // tur 5: 4 -> 0
+		},
+	}
+
+	for turn := 0; turn < 5; turn++ {
+		for player := 1; player <= 2; player++ {
+			fromPoint := moves[player][turn][0]
+			toPoint := moves[player][turn][1]
+			dice := core.ExpandDice(playerDice[player][turn])
+
+			//Demek ki kirik tasi var...Otomatik -1'e ata...
+			if core.PlayerMustEnterFromBar(stones, player) {
+				fromPoint = -1
+			}
+			//--------------------------
+			t.Logf("Turn %d, Player %d, Move: %d -> %d, Dice: %v", turn+1, player, fromPoint, toPoint, dice)
+
+			newStones, ok, usedDice, remainingDice := core.TryMoveStone(stones, player, fromPoint, toPoint, dice)
+			if !ok {
+				t.Errorf("Player %d hamlesi başarısız oldu: %d -> %d", player, fromPoint, toPoint)
+				continue
+			}
+
+			stones = newStones
+
+			t.Logf("Başarılı hareket. Kullanılan zarlar: %v, Kalan zarlar: %v", usedDice, remainingDice)
+			//core.SortStonesByPlayerPointAndStackDesc(stones)
+
+			/*t.Log("Taşların güncel durumu:")
+			for _, stone := range stones {
+				t.Logf("PointIndex: %2d, Player: %d, StackIndex: %d, IsTop: %v, MoveOrder: %d",
+					stone.PointIndex, stone.Player, stone.StackIndex, stone.IsTop, stone.MoveOrder)
+			}*/
 		}
 	}
 }
