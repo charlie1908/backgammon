@@ -1475,6 +1475,19 @@ func TestFullSmilation(t *testing.T) {
 			{3, 2},
 			{3, 2},
 			{3, 2},
+			{6, 1},
+			{6, 2},
+			{6, 3},
+			{6, 2},
+			{5, 5},
+			{6, 5},
+			{2, 2},
+			{6, 5},
+			{4, 3},
+			{4, 3},
+			{1, 1},
+			{3, 1},
+			{2, 2},
 		},
 		2: {
 			{4, 2},
@@ -1489,6 +1502,19 @@ func TestFullSmilation(t *testing.T) {
 			{6, 4},
 			{2, 1},
 			{5, 1},
+			{5, 4},
+			{4, 1},
+			{5, 4},
+			{5, 3},
+			{4, 4},
+			{5, 2},
+			{2, 2},
+			{4, 4},
+			{5, 1},
+			{3, 2},
+			{6, 5},
+			{5, 2},
+			{4, 1},
 		},
 	}
 
@@ -1507,7 +1533,20 @@ func TestFullSmilation(t *testing.T) {
 			{{4, 10}},
 			{{11, 14}, {10, 12}},
 			{{11, 14}, {12, 14}},
-			{{14, 16}, {20, 23}}, //Player 2 in => PointIndex 16 ve 23 kirildi...
+			{{14, 16}, {20, 23}},                   //Player 2 in => PointIndex 16 ve 23 kirildi...
+			{},                                     // Player 1'e gele geldi
+			{},                                     // Player 1'e 2. kere gele geldi
+			{},                                     // Player 1'e 3. kere gele geldi
+			{},                                     // Player 1'e 4. kere gele geldi
+			{{-1, 4}, {-1, 4}, {11, 16}, {11, 16}}, //Player 1 2 tasi da girer ve Player 2 PointIndex 16 tasi kirar..
+			{{4, 9}, {4, 10}},
+			{{9, 17}},
+			{{17, 22}, {14, 20}},
+			{{10, 17}},
+			{{17, 21}, {18, 21}},
+			{{16, 17}, {16, 17}, {22, 23}, {22, 23}}, //Player 2 PointIndex 17 tasi kirar..
+			{{14, 18}},
+			{{17, 19}, {17, 19}, {14, 18}},
 		},
 		//Player 2
 		2: {
@@ -1523,6 +1562,19 @@ func TestFullSmilation(t *testing.T) {
 			{{6, 0}, {23, 19}},
 			{{19, 16}},
 			{{-1, 23}, {-1, 19}}, //Player 1 in => PointIndex 23 kirildi
+			{{23, 19}, {6, 1}},
+			{{6, 2}, {1, 0}},
+			{{19, 10}},
+			{{19, 16}, {10, 5}},
+			{}, //Player 2 gele atti..
+			{{-1, 19}, {19, 17}},
+			{}, // Player 2 gele atti..
+			{}, // Player 2 2. kere gele atti..
+			{{-1, 19}, {2, 1}},
+			{{19, 17}, {3, 0}},
+			{{-1, 19}, {19, 13}},
+			{{13, 6}},
+			{{6, 2}, {0, -1}},
 		},
 	}
 
@@ -1571,6 +1623,10 @@ func TestFullSmilation(t *testing.T) {
 					t.Logf("PointIndex: %2d, Player: %d, StackIndex: %d, IsTop: %v, MoveOrder: %d",
 						stone.PointIndex, stone.Player, stone.StackIndex, stone.IsTop, stone.MoveOrder)
 				}*/
+			}
+
+			if len(turnMoves) == 0 && core.PlayerMustEnterFromBar(stones, player) {
+				log.Printf("Player %d kirik tasi var ve gele geldi!", player)
 			}
 		}
 	}

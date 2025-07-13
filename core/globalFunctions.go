@@ -121,8 +121,12 @@ func MoveTopStoneAndUpdate(stones []*LogicalCoordinate, player int, fromPointInd
 
 		// 💥 Kırma kontrolü — hedef noktada 1 adet rakip taşı varsa kır ve bar'a gönder
 		if countOpponentStonesAtPoint(stones, player, toPointIndex) == 1 {
+			var brokenPlayer int
 			for i, stone := range stones {
 				if stone.PointIndex == toPointIndex && stone.Player != player {
+					// Kırılan taşın oyuncusu
+					brokenPlayer = stone.Player
+
 					// 💾 Kırılan taşı brokenStones içine ekle
 					original := *stones[i] // struct değer kopyası
 					brokenStones = append(brokenStones, &original)
@@ -138,7 +142,8 @@ func MoveTopStoneAndUpdate(stones []*LogicalCoordinate, player int, fromPointInd
 					break
 				}
 			}
-			stones = updateStacks(stones, []int{-1}) // Bar'daki taşların stack bilgisi güncellenir
+			// Sadece kırılan oyuncunun barındaki taşların stack bilgisi güncellenir
+			stones = updateStacks(stones, []int{-1}, brokenPlayer)
 		}
 	}
 	var moveIndex int = -1
@@ -168,7 +173,14 @@ func MoveTopStoneAndUpdate(stones []*LogicalCoordinate, player int, fromPointInd
 	stones[moveIndex].MoveOrder = globalMoveOrder
 
 	// StackIndex Güncellemelerini yap
-	stones = updateStacks(stones, []int{oldPointIndex, toPointIndex})
+	/*stones = updateStacks(stones, []int{oldPointIndex, toPointIndex})*/
+	// StackIndex Güncellemelerini yap
+	if fromPointIndex == -1 {
+		// Oyuncu bar'dan çıktıysa, hem kendi bar'ı hem de hedefi günceller. Player bazli
+		stones = updateStacks(stones, []int{-1, toPointIndex}, player)
+	} else {
+		stones = updateStacks(stones, []int{oldPointIndex, toPointIndex})
+	}
 
 	return stones, true, brokenStones
 }
@@ -560,7 +572,16 @@ func UpdateStacks_Old(stones []*LogicalCoordinate, pointsToUpdate []int) []*Logi
 }
 
 // Sadece verilen noktaların taşlarını günceller. Hem PointIndex hem de StackIndex guncellenir.
-func updateStacks(stones []*LogicalCoordinate, pointsToUpdate []int) []*LogicalCoordinate {
+func updateStacks(stones []*LogicalCoordinate, pointsToUpdate []int, playerFilter ...int) []*LogicalCoordinate {
+	//Barda kimin tasi kirilmis..
+	//Bu sadece kirik taslarin guncellenmesinde player bazli filter eklemek icin kullanilir. Diger Pointindexlerde tek player olacagi icin kullanilmaz..
+	var filterByPlayer bool
+	var player int
+	if len(playerFilter) > 0 {
+		filterByPlayer = true
+		player = playerFilter[0]
+	}
+
 	// pointsToUpdate'deki her nokta için işlemi yap
 	for _, pointIndex := range pointsToUpdate {
 		// 24 (OffBoard) için stack güncellemesi yapma
@@ -572,6 +593,10 @@ func updateStacks(stones []*LogicalCoordinate, pointsToUpdate []int) []*LogicalC
 		group := []*LogicalCoordinate{}
 		for _, stone := range stones {
 			if stone.PointIndex == pointIndex {
+				//Sadece kendisinin kirik taslarinin StackIndexini guncelleyecek..
+				if filterByPlayer && stone.Player != player {
+					continue
+				}
 				group = append(group, stone)
 			}
 		}
@@ -1140,21 +1165,29 @@ func TryMoveStone(
 			return stones, false, dice, nil, nil
 		}
 
+		var usedDie int = -1
 		// Giriş yapılabilecek zar var mı? toPoint'i kontrol etmiyoruz, zarla gelen yere giriyoruz
 		for _, die := range barResult.EnterableDice {
 			entryPoint := GetEntryPoint(player, die)
-			if entryPoint == toPoint {
-				newStones, moved, brokenStones := MoveTopStoneAndUpdate(stones, player, -1, entryPoint)
-				if moved {
-					used := []int{die}
-					//2-) Gercekten zar kullanilinca geri kalan zarlar burada atanir.
-					barResult.RemainingDice = calculateRemainingDice(dice, used) //Kullanilan zar tum zarlardan cikarilir.
-					return newStones, true, used, barResult.RemainingDice, brokenStones
-				}
+			if entryPoint == toPoint && canMoveToPoint(stones, player, toPoint) {
+				usedDie = die
+				break
 			}
 		}
-		// Uygun zar yok veya hedef uyumsuzsa. Bu turn pass gecilir. remainingDice => nil
-		return stones, false, dice, nil, nil
+
+		if usedDie == -1 {
+			// toPoint için uygun zar yok
+			return stones, false, dice, nil, nil
+		}
+
+		newStones, moved, brokenStones := MoveTopStoneAndUpdate(stones, player, -1, toPoint)
+		if !moved {
+			return stones, false, dice, nil, nil
+		}
+
+		used := []int{usedDie}
+		remainingDice := calculateRemainingDice(dice, used)
+		return newStones, true, used, remainingDice, brokenStones
 	}
 
 	// 2. Hedef toplama alanı mı?
@@ -1191,3 +1224,29 @@ func TryMoveStone(
 	newStones, ok, brokenStones = MoveTopStoneAndUpdate(stones, player, fromPoint, toPoint)
 	return newStones, ok, moveResult.UsedDice, moveResult.RemainingDice, brokenStones
 }
+
+/*func updateStacksForPlayerBar(stones []*LogicalCoordinate, player int) []*LogicalCoordinate {
+	// Bar noktası: -1
+	barIndex := -1
+
+	// Bar'daki sadece ilgili oyuncunun taşlarını filtrele
+	group := []*LogicalCoordinate{}
+	for _, stone := range stones {
+		if stone.PointIndex == barIndex && stone.Player == player {
+			group = append(group, stone)
+		}
+	}
+
+	// MoveOrder'a göre sırala (küçük olan altta)
+	sort.Slice(group, func(i, j int) bool {
+		return group[i].MoveOrder < group[j].MoveOrder
+	})
+
+	// StackIndex ve IsTop değerlerini güncelle
+	for i := range group {
+		group[i].StackIndex = i
+		group[i].IsTop = (i == len(group)-1)
+	}
+
+	return stones
+}*/
