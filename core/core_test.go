@@ -3,6 +3,7 @@ package core_test
 import (
 	"backgammon/core"
 	"fmt"
+	"log"
 	"reflect"
 	"slices"
 	"testing"
@@ -28,9 +29,14 @@ func TestMoveTopStoneAndUpdate_ValidMove_WithConsoleOutput(t *testing.T) {
 		t.Fatalf("Normal hareket izin verilmedi ama verilmesi bekleniyordu: %d -> %d", fromPoint, toPoint)
 	}
 
-	updatedStones, moved := core.MoveTopStoneAndUpdate(stones, player, fromPoint, toPoint)
+	updatedStones, moved, broken := core.MoveTopStoneAndUpdate(stones, player, fromPoint, toPoint)
 	if !moved {
 		t.Errorf("Taş hareket etmedi ama hareket mümkün olmalıydı.")
+	}
+
+	//Kirilan taslar yazdirilir..
+	if moved && len(broken) > 0 {
+		log.Printf("Player %d kırdı: %+v", player, broken[0].PointIndex)
 	}
 
 	t.Logf("Taş başarıyla hareket etti: Player %d, %d -> %d", player, fromPoint, toPoint)
@@ -68,7 +74,7 @@ func TestMoveTopStoneAndUpdate_InvalidMove(t *testing.T) {
 	t.Logf("Geçersiz hareket 'IsNormalMoveAllowed()' ile doğru şekilde engellendi: Player %d, %d -> %d", player, fromPoint, toPoint)
 
 	//Burada moved zaten false gelmeli. Bakalim 2. kontrol calisiyor mu ?
-	updatedStones, moved := core.MoveTopStoneAndUpdate(stones, player, fromPoint, toPoint)
+	updatedStones, moved, _ := core.MoveTopStoneAndUpdate(stones, player, fromPoint, toPoint)
 	if moved {
 		t.Errorf("Taş hareket etti ama hareket yasak olmalıydı.")
 	} else {
@@ -149,9 +155,14 @@ func TestMoveTopStoneAndUpdate_CaptureOpponentStoneAndSendToBar(t *testing.T) {
 	}
 
 	// Hareketi uygula
-	updatedStones, moved := core.MoveTopStoneAndUpdate(stones, player, fromPoint, toPoint)
+	updatedStones, moved, broken := core.MoveTopStoneAndUpdate(stones, player, fromPoint, toPoint)
 	if !moved {
 		t.Fatalf("Taş hareket etmedi ama mümkün olmalıydı: %d -> %d", fromPoint, toPoint)
+	}
+
+	//Kirilan taslar yazdirilir..
+	if moved && len(broken) > 0 {
+		log.Printf("Player %d kırdı: %+v", player, broken[0].PointIndex)
 	}
 
 	// Kırılan taş bar’a gitmiş mi?
@@ -691,9 +702,14 @@ func Test_Player1_BarAndMove_WithDoubleFour(t *testing.T) {
 		entryPoint := core.GetEntryPoint(1, die)
 
 		var moved bool
-		stones, moved = core.MoveTopStoneAndUpdate(stones, 1, -1, entryPoint)
+		var broken []*core.LogicalCoordinate
+		stones, moved, broken = core.MoveTopStoneAndUpdate(stones, 1, -1, entryPoint)
 		if !moved {
 			t.Fatalf("Bar'dan taş %d için hareket başarısız", used+1)
+		}
+		//Kirilan taslar yazdirilir..
+		if moved && len(broken) > 0 {
+			log.Printf("Player %d kırdı: %+v", 1, broken[0].PointIndex)
 		}
 		used++
 	}
@@ -707,9 +723,14 @@ func Test_Player1_BarAndMove_WithDoubleFour(t *testing.T) {
 	if !moveResult.Allowed {
 		t.Fatal("4'ten 9'ye hareket izni verilmedi (Player 1)")
 	}
-	stones, moved := core.MoveTopStoneAndUpdate(stones, 1, 4, 9)
+	stones, moved, broken := core.MoveTopStoneAndUpdate(stones, 1, 4, 9)
 	if !moved {
 		t.Fatal("4'ten 9'ye taşıma başarısız")
+	}
+
+	//Kirilan taslar yazdirilir..
+	if moved && len(broken) > 0 {
+		log.Printf("Player %d kırdı: %+v", 1, broken[0].PointIndex)
 	}
 
 	// --- Kontroller ---
@@ -1154,10 +1175,18 @@ func TestPlayer2CollectStones(t *testing.T) {
 			for index := 5; index >= 0; index-- {
 				result, remainingDice, usedDice := core.CanBearOffStone(stones, player, index, dice)
 				if result {
-					stones, result = core.MoveTopStoneAndUpdate(stones, player, index, 24)
+					var broken []*core.LogicalCoordinate
+					stones, result, broken = core.MoveTopStoneAndUpdate(stones, player, index, 24)
+
 					if !result {
 						t.Fatalf("MoveTopStoneAndUpdate başarısız oldu: index %d", index)
 					}
+
+					//Kirilan taslar yazdirilir..
+					if result && len(broken) > 0 {
+						log.Printf("Player %d kırdı: %+v", player, broken[0].PointIndex)
+					}
+
 					//Zarlar Player'a gore gercek degeri ile gosterilir.
 					entryPoints := []int{}
 					for _, d := range dice {
@@ -1297,10 +1326,17 @@ func TestPlayer2CollectStonesWithBiggerDice(t *testing.T) {
 			for index := 5; index >= 0; index-- {
 				result, remainingDice, usedDice := core.CanBearOffStone(stones, player, index, dice)
 				if result {
-					stones, result = core.MoveTopStoneAndUpdate(stones, player, index, 24)
+					var broken []*core.LogicalCoordinate
+					stones, result, broken = core.MoveTopStoneAndUpdate(stones, player, index, 24)
 					if !result {
 						t.Fatalf("MoveTopStoneAndUpdate başarısız oldu: index %d", index)
 					}
+
+					//Kirilan taslar yazdirilir..
+					if result && len(broken) > 0 {
+						log.Printf("Player %d kırdı: %+v", player, broken[0].PointIndex)
+					}
+
 					//Zarlar Player'a gore gercek degeri ile gosterilir.
 					entryPoints := []int{}
 					for _, d := range dice {
@@ -1396,10 +1432,14 @@ func TestTryMoveStone_FiveTurnsAlternatingPlayers(t *testing.T) {
 			//--------------------------
 			t.Logf("Turn %d, Player %d, Move: %d -> %d, Dice: %v", turn+1, player, fromPoint, toPoint, dice)
 
-			newStones, ok, usedDice, remainingDice := core.TryMoveStone(stones, player, fromPoint, toPoint, dice)
+			newStones, ok, usedDice, remainingDice, broken := core.TryMoveStone(stones, player, fromPoint, toPoint, dice)
 			if !ok {
 				t.Errorf("Player %d hamlesi başarısız oldu: %d -> %d", player, fromPoint, toPoint)
 				continue
+			}
+			//Kirilan taslar yazdirilir..
+			if ok && len(broken) > 0 {
+				log.Printf("Player %d kırdı: %+v", player, broken[0].PointIndex)
 			}
 
 			stones = newStones
@@ -1412,6 +1452,126 @@ func TestTryMoveStone_FiveTurnsAlternatingPlayers(t *testing.T) {
 				t.Logf("PointIndex: %2d, Player: %d, StackIndex: %d, IsTop: %v, MoveOrder: %d",
 					stone.PointIndex, stone.Player, stone.StackIndex, stone.IsTop, stone.MoveOrder)
 			}*/
+		}
+	}
+}
+
+func TestFullSmilation(t *testing.T) {
+	//Butun taslar dizildi
+	stones := core.GetInitialStones()
+
+	// Atilan zarlar (her tur için player ayrı ayrı)
+	playerDice := map[int][][]int{
+		1: {
+			{6, 5},
+			{4, 2},
+			{6, 4},
+			{6, 2},
+			{5, 1},
+			{5, 4},
+			{2, 1},
+			{5, 2},
+			{2, 4},
+			{3, 2},
+			{3, 2},
+			{3, 2},
+		},
+		2: {
+			{4, 2},
+			{6, 1},
+			{5, 3},
+			{4, 2},
+			{6, 4},
+			{5, 3},
+			{4, 2},
+			{5, 2},
+			{1, 4},
+			{6, 4},
+			{2, 1},
+			{5, 1},
+		},
+	}
+
+	// Oynanan Taslar (fromPoint -> toPoint)
+	moves := map[int][][][2]int{
+		//Player 1
+		1: {
+			{{0, 11}},
+			{{16, 20}, {18, 20}},
+			{{16, 22}, {18, 22}},
+			{{16, 22}, {11, 13}},
+			{{13, 18}, {0, 1}},
+			{{-1, 4}, {4, 8}}, // Kirik Tasini  girdi..
+			{{11, 14}},
+			{{-1, 4}, {18, 20}},
+			{{4, 10}},
+			{{11, 14}, {10, 12}},
+			{{11, 14}, {12, 14}},
+			{{14, 16}, {20, 23}}, //Player 2 in => PointIndex 16 ve 23 kirildi...
+		},
+		//Player 2
+		2: {
+			{{5, 3}, {7, 3}},
+			{{12, 6}, {7, 6}}, //
+			{{7, 2}, {5, 2}},  //
+			{{12, 6}},         //
+			{{12, 6}, {5, 1}}, // Player 1 in => PointIndex 1 kirildi...
+			{{6, 1}, {6, 3}},
+			{{12, 10}, {12, 8}},
+			{{8, 6}, {10, 5}},
+			{{5, 0}},
+			{{6, 0}, {23, 19}},
+			{{19, 16}},
+			{{-1, 23}, {-1, 19}}, //Player 1 in => PointIndex 23 kirildi
+		},
+	}
+
+	for turn := 0; turn < len(playerDice[1]); turn++ {
+		for player := 1; player <= 2; player++ {
+			turnMoves := moves[player][turn]
+			dice := core.ExpandDice(playerDice[player][turn])
+
+			t.Logf("===== Turn %d | Player %d | Zarlar: %v =====", turn+1, player, dice)
+
+			for moveIndex, move := range turnMoves {
+				if len(dice) == 0 {
+					t.Logf("Player %d için zar kalmadı, hamle durduruluyor", player)
+					break
+				}
+
+				fromPoint := move[0]
+				toPoint := move[1]
+
+				// Kirik taş varsa, otomatik bar'dan gir
+				if core.PlayerMustEnterFromBar(stones, player) {
+					fromPoint = -1
+				}
+
+				t.Logf("Move %d.%d: %d -> %d, Dice: %v", turn+1, moveIndex+1, fromPoint, toPoint, dice)
+
+				newStones, ok, usedDice, remainingDice, broken := core.TryMoveStone(stones, player, fromPoint, toPoint, dice)
+				if !ok {
+					t.Errorf("Player %d hamlesi başarısız oldu: %d -> %d", player, fromPoint, toPoint)
+					break // başarısızsa durdurabiliriz, ya da continue
+				}
+
+				if len(broken) > 0 {
+					log.Printf("Player %d kırdı: PointIndex=%d, Player=%d", player, broken[0].PointIndex, broken[0].Player)
+				}
+
+				stones = newStones
+				dice = remainingDice
+
+				t.Logf("Başarılı hareket. Kullanılan zarlar: %v, Kalan zarlar: %v", usedDice, remainingDice)
+
+				/*core.SortStonesByPlayerPointAndStackDesc(stones)
+
+				t.Log("Taşların güncel durumu:")
+				for _, stone := range stones {
+					t.Logf("PointIndex: %2d, Player: %d, StackIndex: %d, IsTop: %v, MoveOrder: %d",
+						stone.PointIndex, stone.Player, stone.StackIndex, stone.IsTop, stone.MoveOrder)
+				}*/
+			}
 		}
 	}
 }

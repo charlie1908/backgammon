@@ -94,20 +94,21 @@ func SortStonesByPlayerPointAndStackAsc(stones []*LogicalCoordinate) {
 // 1-) Kirik tasi var mi "IsAllBarEntryAllowed()" ve Taslar istenen PointIndex'e hareket edebiliyor mu "IsNormalMoveAllowed()" bakildiktan sonra cagrilir.
 // 2-) Taslarin PointIndexlerini gercekten yer degistirerek ayrica ayrildigi ve tasindigi guruplarin Stackindexlerini degistirerek taslari gerckten hareket ettirir.
 // 3-) Arada rakibin kirilan tasi var ise kirar..
-func MoveTopStoneAndUpdate(stones []*LogicalCoordinate, player int, fromPointIndex int, toPointIndex int) ([]*LogicalCoordinate, bool) {
+func MoveTopStoneAndUpdate(stones []*LogicalCoordinate, player int, fromPointIndex int, toPointIndex int) ([]*LogicalCoordinate, bool, []*LogicalCoordinate) {
 
+	var brokenStones []*LogicalCoordinate //Varsa kirilan taslar
 	//Normalde IsAllBarEntryAllowed(), IsNormalMoveAllowed() functionlari bu Methodun basinda cagrilip bakilmali. Ama gene de bir ekstra 3 kontrol koyma ihtiyaci duydum.
 
 	// 1. Gecerli oyuncun belirtilen yerde en ustte tasi var mi ?
 	if !playerHasTopStoneAt(stones, player, fromPointIndex) {
-		return stones, false // Oyuncunun bu noktada üstte taşı yok, hareket edemez
+		return stones, false, brokenStones // Oyuncunun bu noktada üstte taşı yok, hareket edemez
 	}
 
 	// 2. Hedef nokta geçerli mi?
 	//if toPointIndex < 0 || toPointIndex >= 24 {
 	//Taslar Toplana da bilir..
 	if toPointIndex < 0 || toPointIndex > 24 {
-		return stones, false
+		return stones, false, brokenStones
 	}
 
 	// toPointIndex 24 değilse karsi rakibin taslari ile [len(stone)>1] blokaj ve kırma kontrollerini yap
@@ -115,13 +116,17 @@ func MoveTopStoneAndUpdate(stones []*LogicalCoordinate, player int, fromPointInd
 		//Karsi rakibin birden fazla tasi var mi ? ilgili PointIndex'inde..
 		// 3. Hedef nokta rakip tarafindan blokaj altinda mi ?
 		if !canMoveToPoint(stones, player, toPointIndex) {
-			return stones, false // Hareket yasak
+			return stones, false, brokenStones // Hareket yasak
 		}
 
 		// 💥 Kırma kontrolü — hedef noktada 1 adet rakip taşı varsa kır ve bar'a gönder
 		if countOpponentStonesAtPoint(stones, player, toPointIndex) == 1 {
 			for i, stone := range stones {
 				if stone.PointIndex == toPointIndex && stone.Player != player {
+					// 💾 Kırılan taşı brokenStones içine ekle
+					original := *stones[i] // struct değer kopyası
+					brokenStones = append(brokenStones, &original)
+
 					stones[i].PointIndex = -1
 					stones[i].PositionType = PositionTypeEnum.Bar
 					stones[i].StackIndex = 0
@@ -129,6 +134,7 @@ func MoveTopStoneAndUpdate(stones []*LogicalCoordinate, player int, fromPointInd
 
 					globalMoveOrder++
 					stones[i].MoveOrder = globalMoveOrder
+
 					break
 				}
 			}
@@ -146,7 +152,7 @@ func MoveTopStoneAndUpdate(stones []*LogicalCoordinate, player int, fromPointInd
 
 	if moveIndex == -1 {
 		// Taş bulunamadı, hareket yapılmadı
-		return stones, false
+		return stones, false, brokenStones
 	}
 
 	oldPointIndex := stones[moveIndex].PointIndex
@@ -164,7 +170,7 @@ func MoveTopStoneAndUpdate(stones []*LogicalCoordinate, player int, fromPointInd
 	// StackIndex Güncellemelerini yap
 	stones = updateStacks(stones, []int{oldPointIndex, toPointIndex})
 
-	return stones, true
+	return stones, true, brokenStones
 }
 
 // Oynayacak Player'in belirtilen from noktasindaki taş dilimlerinde en üstte taşa sahip olup olmadığını kontrol eder.
@@ -1125,30 +1131,30 @@ func TryMoveStone(
 	fromPoint int,
 	toPoint int,
 	dice []int,
-) (newStones []*LogicalCoordinate, ok bool, usedDice []int, remainingDice []int) {
+) (newStones []*LogicalCoordinate, ok bool, usedDice []int, remainingDice []int, brokenStones []*LogicalCoordinate) {
 
 	// 1. Bar'dan giriş durumu. Kirik tas var mi ?
 	if fromPoint == -1 {
 		barResult := IsAnyBarEntryAllowed(stones, player, dice) //1-) barResult.RemainingDice kullanilabilecek zarlardan sonra geri kalan kirigi sokamayacagin zarlari ifade eder.
 		if !barResult.FromBar || !barResult.Allowed {
-			return stones, false, dice, nil
+			return stones, false, dice, nil, nil
 		}
 
 		// Giriş yapılabilecek zar var mı? toPoint'i kontrol etmiyoruz, zarla gelen yere giriyoruz
 		for _, die := range barResult.EnterableDice {
 			entryPoint := GetEntryPoint(player, die)
 			if entryPoint == toPoint {
-				newStones, moved := MoveTopStoneAndUpdate(stones, player, -1, entryPoint)
+				newStones, moved, brokenStones := MoveTopStoneAndUpdate(stones, player, -1, entryPoint)
 				if moved {
 					used := []int{die}
 					//2-) Gercekten zar kullanilinca geri kalan zarlar burada atanir.
 					barResult.RemainingDice = calculateRemainingDice(dice, used) //Kullanilan zar tum zarlardan cikarilir.
-					return newStones, true, used, barResult.RemainingDice
+					return newStones, true, used, barResult.RemainingDice, brokenStones
 				}
 			}
 		}
 		// Uygun zar yok veya hedef uyumsuzsa. Bu turn pass gecilir. remainingDice => nil
-		return stones, false, dice, nil
+		return stones, false, dice, nil, nil
 	}
 
 	// 2. Hedef toplama alanı mı?
@@ -1163,25 +1169,25 @@ func TryMoveStone(
 
 	// 3. Oyuncunun fromPoint noktasında en üst taşı var mı?
 	if !playerHasTopStoneAt(stones, player, fromPoint) {
-		return stones, false, dice, nil
+		return stones, false, dice, nil, nil
 	}
 
 	// 4. Bear-off kontrolü
 	if isBearOff(toPoint) {
 		canBearOff, remaining, used := CanBearOffStone(stones, player, fromPoint, dice)
 		if !canBearOff {
-			return stones, false, dice, nil
+			return stones, false, dice, nil, nil
 		}
-		newStones, ok := MoveTopStoneAndUpdate(stones, player, fromPoint, toPoint)
-		return newStones, ok, used, remaining
+		newStones, ok, brokenStones := MoveTopStoneAndUpdate(stones, player, fromPoint, toPoint)
+		return newStones, ok, used, remaining, brokenStones
 	}
 
 	// 5. Normal taş hareketi
 	moveResult := IsNormalMoveAllowed(stones, player, fromPoint, toPoint, dice)
 	if !moveResult.Allowed {
-		return stones, false, dice, nil
+		return stones, false, dice, nil, nil
 	}
 
-	newStones, ok = MoveTopStoneAndUpdate(stones, player, fromPoint, toPoint)
-	return newStones, ok, moveResult.UsedDice, moveResult.RemainingDice
+	newStones, ok, brokenStones = MoveTopStoneAndUpdate(stones, player, fromPoint, toPoint)
+	return newStones, ok, moveResult.UsedDice, moveResult.RemainingDice, brokenStones
 }
