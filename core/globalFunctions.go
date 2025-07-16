@@ -455,7 +455,46 @@ func IsNormalMoveAllowed(stones []*LogicalCoordinate, player int, fromPointIndex
 		}
 	}
 
-	// *** 3 zarla hareket kontrolü buraya eklendi ***
+	// *** Double'dan geriye 3 zar kaldıysa (örnek: 1,1,1), 3 zarla hareket kontrolü ***
+	if !canMove && len(dice) == 3 {
+		sum := 0
+		canReach := true
+		for i := 1; i <= 3; i++ {
+			sum += dice[0] // hepsi aynı zar (double)
+			intermediate := fromPointIndex + direction*sum
+
+			if i < 3 && !canMoveToPoint(stones, player, intermediate) {
+				canReach = false
+				break
+			}
+		}
+		if canReach && (fromPointIndex+direction*sum) == toPointIndex && canMoveToPoint(stones, player, toPointIndex) {
+			usedDie = []int{dice[0], dice[1], dice[2]} // 3 zar kullanıldı
+			canMove = true
+		}
+	}
+
+	// *** Double geldiği zaman 2 zarla hareket kontrolü buraya eklendi ***
+	if !canMove && len(dice) == 4 {
+		// 2 zar kullanarak hedefe varma kontrolü (örn: ilk 2 zarla)
+		sum := 0
+		canReach := true
+		for i := 1; i <= 2; i++ {
+			sum += dice[0] // hepsi aynı zar (double) olduğu için dice[0]
+			intermediate := fromPointIndex + direction*sum
+
+			if i < 2 && !canMoveToPoint(stones, player, intermediate) { // ara noktalar engelli mi?
+				canReach = false
+				break
+			}
+		}
+		if canReach && (fromPointIndex+direction*sum) == toPointIndex && canMoveToPoint(stones, player, toPointIndex) {
+			usedDie = []int{dice[0], dice[1]} // ilk 2 zar kullanıldı
+			canMove = true
+		}
+	}
+
+	// *** Double geldiği zaman 3 zarla hareket kontrolü buraya eklendi ***
 	if !canMove && len(dice) == 4 {
 		// 3 zar kullanarak hedefe varma kontrolü (örn: ilk 3 zarla)
 		sum := 0
@@ -571,7 +610,8 @@ func UpdateStacks_Old(stones []*LogicalCoordinate, pointsToUpdate []int) []*Logi
 	return updatedStones
 }
 
-// Sadece verilen noktaların taşlarını günceller. Hem PointIndex hem de StackIndex guncellenir.
+// Sadece verilen noktaların taşlarını günceller. Hem PointIndex hem de StackIndex guncellenir. Eski yeri ve gittigi yer, her ikisi de guncellenir.
+// Tas kiriliyor ise playerFilter gelir. Kirilan tas kimin filter'i. Geri kalan guncellemelerde Player filitresine ihtiyac yok.
 func updateStacks(stones []*LogicalCoordinate, pointsToUpdate []int, playerFilter ...int) []*LogicalCoordinate {
 	//Barda kimin tasi kirilmis..
 	//Bu sadece kirik taslarin guncellenmesinde player bazli filter eklemek icin kullanilir. Diger Pointindexlerde tek player olacagi icin kullanilmaz..
@@ -891,6 +931,7 @@ func GetPossibleMovePoints_NotSupport24BearOff(
 	return possiblePoints
 }
 
+// Bir tas secilince PointIndex ,Zar ve Player bilgisi ile gidilebilecek PointIndex noktalari verilir. Bir cesit Bot Helper..
 // [24 bear off] tas playera gore toplama alani icinde ise 24 PointIndex sunulur ama tas disardan geliyor ise 24 PointIndex sunulmaz. Disardan dogrudan gelen tasin Bear Off olmasini bu functionda desteklenmiyor.
 func GetPossibleMovePoints(
 	stones []*LogicalCoordinate,
@@ -912,6 +953,7 @@ func GetPossibleMovePoints(
 	/*isBearOffTarget := func(to int) bool {
 		return to >= 24
 	}*/
+	//Tas toplanirken Player yonune gore Player 1 > 24 ve Player 2 < 0 "to" degerine bakilir ama toplanan her tasin PointIndex'i 24 dur!
 	isBearOffTarget := func(to int) bool {
 		if player == 1 {
 			return to >= 24
@@ -1026,6 +1068,7 @@ func GetPossibleMovePoints(
 	return possiblePoints
 }
 
+// Oyuncuya gore Tas Toplama PointIndex araliklari belirleniyor.
 func getBearoffRangeForPlayer(player int) []int {
 	if player == 1 {
 		return []int{18, 19, 20, 21, 22, 23}
@@ -1033,7 +1076,7 @@ func getBearoffRangeForPlayer(player int) []int {
 	return []int{0, 1, 2, 3, 4, 5}
 }
 
-// Toplamak icin tum taslar olmasi gereken yerde mi ?
+// Toplamak icin(Bear_Off) tum taslar olmasi gereken yerde mi ?
 func AreAllStonesInBearOffArea(stones []*LogicalCoordinate, player int) bool {
 	bearOffRange := getBearoffRangeForPlayer(player)
 
@@ -1069,8 +1112,8 @@ func removeDieAtIndex(dice []int, index int) []int {
 }
 
 // Bu Fonksiyonun sonrasinda => "MoveTopStoneAndUpdate(stones, player, fromIndex, 24)" tasi toplamak icin cagrilir...
-// [24 bear off] tas playera gore toplama alani icinde olmadan olmuyor. Disardan dogrudan gelen tasin Bear Off olmasini bu function desteklemiyor.
-// Tas Toplamaya Uygun mu
+// [24 bear off] tas playera gore toplama alani icinde olmadan olmuyor. Disardan dogrudan gelen tasin Bear Off olmasini bu function desteklenmiyor.
+// Tas Toplamaya Uygun mu, kullanilan zar(usedDice) ve geriye kullanilabilecek zar(remainingDice) da donulur.
 func CanBearOffStone(stones []*LogicalCoordinate, player int, pointIndex int, dice []int) (result bool, remainingDice []int, usedDice []int) {
 	// 1. Tüm taşlar Player icin toplama alanında mı?
 	if !AreAllStonesInBearOffArea(stones, player) {
@@ -1109,7 +1152,7 @@ func CanBearOffStone(stones []*LogicalCoordinate, player int, pointIndex int, di
 	// Daha büyük zar var mı? Atilan zardan ornek 4'den daha geride 5-6'da tas var mi diye bakilir..
 	for i, die := range dice {
 		if die > distance {
-			// Daha geride taş var mı kontrol et
+			// Daha geride taş var mı kontrol et varsa o pointIndexdeki tasi alamassin => return false
 			for _, s := range stones {
 				if s.Player != player || s.PointIndex == 24 || s.PointIndex == pointIndex {
 					continue
@@ -1129,6 +1172,7 @@ func CanBearOffStone(stones []*LogicalCoordinate, player int, pointIndex int, di
 	return false, dice, nil
 }
 
+// Kazanan Player'i belirlemek icin kullanilir.
 func IsFinishedForPlayer(stones []*LogicalCoordinate, player int) bool {
 	for _, s := range stones {
 		if s.Player == player && s.PointIndex != 24 {
@@ -1150,6 +1194,41 @@ func IsFinishedForPlayer_MoreCheck(stones []*LogicalCoordinate, player int) bool
 	return count == 15 // Tavlada bir oyuncunun 15 taşı vardır
 }
 
+/*TryMoveStone, bir oyuncunun taşını belirtilen noktadan başka bir noktaya taşımayı dener.
+Bu fonksiyon, verilen zar(lar) ve mevcut taş durumu üzerinden geçerli bir hamle olup olmadığını kontrol eder ve uygular.
+Yani once PointIndex'ini degistirir. Sonra gitti yiginda StackIndex'ini degistirip isTop= true yapar ve
+sort isleminde en tepede ciksin diye global artan MoveOrder degeri kullanilir.
+
+Parametreler:
+  - stones: Oyun tahtasındaki mevcut tüm taşların listesi.
+  - player: Hamleyi yapan oyuncunun numarası (1 veya 2).
+  - fromPoint: Taşın bulunduğu noktanın indeksidir. -1 ise oyuncunun bar’daki (kırık) taşını içeri soktuğu anlamına gelir.
+  - toPoint: Taşın gitmek istediği hedef noktanın indeksidir. 24 ise taş toplanmak (bearing off / Africa) isteniyor demektir.
+  - dice: Oyuncunun o turda sahip olduğu kullanılabilir zarlar.
+
+Geri Dönenler:
+  - newStones: Taşların güncellenmiş hali (hamle başarılıysa).
+  - ok: Hamlenin kurallara uygun olup olmadığını belirten bool değer.
+  - usedDice: Hamlede kullanılan zar(lar).
+  - remainingDice: Kullanılmayan zarlar (hamleden sonra kalır).
+  - brokenStones: Eğer rakip taş kırıldıysa, kırılan taş(lar)ın orijinal (eski) hali.
+
+Açıklama:
+  - Bar’dan giriş: Eğer fromPoint == -1 ise, oyuncunun bar’daki taşını zar değerine göre uygun giriş noktasına sokulup sokamayacağı kontrol edilir.
+    Rakibin taşı varsa ve tekse kırılır, bar’a gönderilir.
+  - Normal hamle: Oyuncunun tahtadaki taşlarıyla, zar değeri kadar ileriye hamle yapması kontrol edilir. Rakip taş varsa kırma veya blokaj kontrolü yapılır.
+  - BearOff (taş toplama): Eğer toPoint == 24 ise, taş toplanmak isteniyordur. Oyuncunun tüm taşları son bölgede mi ve zar uygun mu diye kontrol edilir.
+
+Kurallar:
+  - Oyuncunun bar’da kırık taşı varsa, önce onu içeri sokması gerekir (öncelikli hamledir).
+  - Hedef noktada 1 adet rakip taşı varsa, kırma işlemi yapılır ve rakip taş bar’a gönderilir.
+  - Bar’a gönderilen taşlar ilgili oyuncuya göre güncellenir ve bar'daki yığılma (StackIndex) sırası yeniden hesaplanır.
+
+Not:
+  - Bu fonksiyon yalnızca taşların hareketini ve geçerliliğini yönetir. Görsellik veya animasyon içermez.
+  - Gerekli kuralların kontrolü için `MoveTopStoneAndUpdate`, `IsAnyBarEntryAllowed`, `calculateRemainingDice` gibi yardımcı fonksiyonlar içeride çağrılır.*/
+
+// Son Kullanicinin hersey icin kullanacagi Function => Test : TestFullSmilation()
 func TryMoveStone(
 	stones []*LogicalCoordinate,
 	player int,
@@ -1192,12 +1271,13 @@ func TryMoveStone(
 
 	// 2. Hedef toplama alanı mı?
 	isBearOff := func(to int) bool {
-		if player == 1 {
+		/*if player == 1 {
 			return to >= 24
 		} else if player == 2 {
 			return to < 0
 		}
-		return false
+		return false*/
+		return to >= 24
 	}
 
 	// 3. Oyuncunun fromPoint noktasında en üst taşı var mı?
@@ -1223,6 +1303,17 @@ func TryMoveStone(
 
 	newStones, ok, brokenStones = MoveTopStoneAndUpdate(stones, player, fromPoint, toPoint)
 	return newStones, ok, moveResult.UsedDice, moveResult.RemainingDice, brokenStones
+}
+
+// Player Bazinda toplanan toplam tas(Bear_Off) sayisini verir..
+func CountCollectedStones(stones []*LogicalCoordinate, player int) int {
+	count := 0
+	for _, s := range stones {
+		if s.Player == player && s.PointIndex == 24 {
+			count++
+		}
+	}
+	return count
 }
 
 /*func updateStacksForPlayerBar(stones []*LogicalCoordinate, player int) []*LogicalCoordinate {
