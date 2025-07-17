@@ -40,13 +40,17 @@ func main() {
 	fmt.Printf("Zarlar: %s\n", strDice)
 
 	//stones, moved := core.MoveStoneAndUpdate(stones, 0, 11, 1)
-	stones, moved := core.MoveTopStoneAndUpdate(stones, 1, 0, 11)
+	stones, moved, brokenStones := core.MoveTopStoneAndUpdate(stones, 1, 0, 11)
 	core.SortStonesByPlayerPointAndStackDesc(stones)
 	if moved {
 		fmt.Println("Taş başarıyla hareket etti.")
 		fmt.Println("Taşların Son Durumu:")
 		for _, stone := range stones {
 			fmt.Printf("PointIndex: %d, Player: %d, StackIndex: %d, IsTop: %v\n, MoveOrder: %d\n",
+				stone.PointIndex, stone.Player, stone.StackIndex, stone.IsTop, stone.MoveOrder)
+		}
+		for _, stone := range brokenStones {
+			fmt.Printf("Kirilan Tas PointIndex: %d, Player: %d, StackIndex: %d, IsTop: %v\n, MoveOrder: %d\n",
 				stone.PointIndex, stone.Player, stone.StackIndex, stone.IsTop, stone.MoveOrder)
 		}
 	} else {

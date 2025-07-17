@@ -832,6 +832,120 @@ func TestPlayer2PossibleMoves(t *testing.T) {
 	}
 }
 
+func TestPlayer2PossibleMovesFromBar(t *testing.T) {
+	player1 := 1
+	player2 := 2
+
+	var stones []*core.LogicalCoordinate
+
+	//Player 2 kirik tasi
+	stones = append(stones, &core.LogicalCoordinate{PointIndex: -1, Player: player2, IsTop: true, PositionType: core.PositionTypeEnum.Bar})
+
+	// Player 1 taşları
+	stones = append(stones, &core.LogicalCoordinate{PointIndex: 18, Player: player1, IsTop: true})
+	//stones = append(stones, &core.LogicalCoordinate{PointIndex: 18, Player: player1, IsTop: true})
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 19, Player: player2, IsTop: i == 1})
+	}
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 20, Player: player1, IsTop: i == 1})
+	}
+	for i := 0; i < 3; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 22, Player: player1, IsTop: i == 2})
+	}
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 23, Player: player1, IsTop: i == 1})
+	}
+
+	dice := []int{6, 3}
+
+	// Player 2 için -1 noktasından hareketler
+	possibleFromBar := core.GetPossibleMovePoints(stones, player2, -1, dice)
+	t.Logf("Player 2 taşları -1 noktasından gidebileceği noktalar: %v", possibleFromBar)
+
+	expected := []int{18, 21}
+	//expected := []int{21}
+	if !reflect.DeepEqual(possibleFromBar, expected) {
+		t.Fatalf("PointIndex 18 ve 21 olmasi gerekir!")
+	}
+
+	dice2 := []int{4, 1}
+
+	// Player 2 için -1 noktasından hareketler
+	possibleFromBar2 := core.GetPossibleMovePoints(stones, player2, -1, dice2)
+	t.Logf("Player 2 taşları 12 noktasından gidebileceği noktalar: %v", possibleFromBar2)
+
+	if len(possibleFromBar2) != 0 {
+		t.Fatalf("PointIndex hic olmamasi gerekir!")
+	}
+}
+
+func TestPlayer2PossibleMovesFor3Dice(t *testing.T) {
+	player1 := 1
+	player2 := 2
+
+	var stones []*core.LogicalCoordinate
+
+	//Player 1
+	stones = append(stones, &core.LogicalCoordinate{PointIndex: 0, Player: player1, IsTop: true, PositionType: core.PositionTypeEnum.Point})
+	stones = append(stones, &core.LogicalCoordinate{PointIndex: 1, Player: player1, IsTop: true, PositionType: core.PositionTypeEnum.Point})
+
+	// Player 2 taşları
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 4, Player: player2, IsTop: i == 1})
+	}
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 5, Player: player2, IsTop: i == 1})
+	}
+
+	dice := []int{1, 1, 1}
+
+	// Player 1 için 0 noktasından hareketler
+	possibleFromBar := core.GetPossibleMovePoints(stones, player1, 0, dice)
+	t.Logf("Player 1 taşları 0 noktasından gidebileceği noktalar: %v", possibleFromBar)
+
+	expected := []int{1, 2, 3}
+	if !reflect.DeepEqual(possibleFromBar, expected) {
+		t.Fatalf("PointIndex 1,2 ve 3 olmasi gerekir!")
+	}
+
+	// Player 1 için 1 noktasından hareketler
+	possibleFromBar1 := core.GetPossibleMovePoints(stones, player1, 1, dice)
+	t.Logf("Player 1 taşları  noktasından gidebileceği noktalar: %v", possibleFromBar1)
+
+	expected1 := []int{2, 3}
+	if !reflect.DeepEqual(possibleFromBar1, expected1) {
+		t.Fatalf("PointIndex 2 ve 3 olmasi gerekir!")
+	}
+}
+
+func TestPlayer2PossibleMovesForDoubleDice(t *testing.T) {
+	player2 := 2
+
+	stones := core.GetInitialStones()
+
+	dice := core.ExpandDice([]int{3, 3})
+
+	// Player 2 için 23 noktasından hareketler
+	possibleFromBar := core.GetPossibleMovePoints(stones, player2, 23, dice)
+	t.Logf("Player 2 taşları 23 noktasından gidebileceği noktalar: %v", possibleFromBar)
+
+	expected := []int{14, 17, 20}
+	if !reflect.DeepEqual(possibleFromBar, expected) {
+		t.Fatalf("PointIndex 14,17 ve 20 olmasi gerekir!")
+	}
+
+	dice1 := core.ExpandDice([]int{4, 4})
+	// Player 1 için 1 noktasından hareketler
+	possibleFromBar1 := core.GetPossibleMovePoints(stones, player2, 23, dice1)
+	t.Logf("Player 2 taşları  noktasından gidebileceği noktalar: %v", possibleFromBar1)
+
+	expected1 := []int{15, 19}
+	if !reflect.DeepEqual(possibleFromBar1, expected1) {
+		t.Fatalf("PointIndex 19 ve 15 olmasi gerekir!")
+	}
+}
+
 func TestPlayer1ComplexPossibleMoves(t *testing.T) {
 	player1 := 1
 	player2 := 2
@@ -1065,7 +1179,7 @@ func TestPlayer2PossibleMoveForThreeDice(t *testing.T) {
 
 	var stones []*core.LogicalCoordinate
 
-	// Player 2 taşları, 22 noktasında 5 taş var ve top o
+	// Player 2 taşları, 12 noktasında 5 taş var ve top o
 	for i := 0; i < 5; i++ {
 		stones = append(stones, &core.LogicalCoordinate{
 			PointIndex: 12,
@@ -1918,6 +2032,170 @@ func TestFullSmilation2(t *testing.T) {
 			{{18, 6}, {9, 3}, {9, 3}},
 			{{6, 4}, {5, 24}},
 			{{5, 24}, {4, 2}},
+		},
+	}
+
+	for turn := 0; turn < len(playerDice[1]); turn++ {
+		for player := 1; player <= 2; player++ {
+			turnMoves := moves[player][turn]
+			dice := core.ExpandDice(playerDice[player][turn])
+
+			t.Logf("===== Turn %d | Player %d | Zarlar: %v =====", turn+1, player, dice)
+
+			for moveIndex, move := range turnMoves {
+				if len(dice) == 0 {
+					t.Logf("Player %d için zar kalmadı, hamle durduruluyor", player)
+					break
+				}
+
+				fromPoint := move[0]
+				toPoint := move[1]
+
+				// Kirik taş varsa, otomatik bar'dan gir
+				if core.PlayerMustEnterFromBar(stones, player) {
+					fromPoint = -1
+				}
+
+				t.Logf("Move %d.%d: %d -> %d, Dice: %v", turn+1, moveIndex+1, fromPoint, toPoint, dice)
+
+				newStones, ok, usedDice, remainingDice, broken := core.TryMoveStone(stones, player, fromPoint, toPoint, dice)
+				if !ok {
+					t.Errorf("Player %d hamlesi başarısız oldu: %d -> %d", player, fromPoint, toPoint)
+					break // başarısızsa durdurabiliriz, ya da continue
+				}
+
+				if len(broken) > 0 {
+					log.Printf("Player %d kırdı: PointIndex=%d, Player=%d", player, broken[0].PointIndex, broken[0].Player)
+				}
+
+				stones = newStones
+				dice = remainingDice
+
+				t.Logf("Başarılı hareket. Kullanılan zarlar: %v, Kalan zarlar: %v", usedDice, remainingDice)
+
+				/*core.SortStonesByPlayerPointAndStackDesc(stones)
+
+				t.Log("Taşların güncel durumu:")
+				for _, stone := range stones {
+					t.Logf("PointIndex: %2d, Player: %d, StackIndex: %d, IsTop: %v, MoveOrder: %d",
+						stone.PointIndex, stone.Player, stone.StackIndex, stone.IsTop, stone.MoveOrder)
+				}*/
+			}
+
+			if len(turnMoves) == 0 && core.PlayerMustEnterFromBar(stones, player) {
+				log.Printf("Player %d kirik tasi var ve gele geldi!", player)
+			}
+		}
+	}
+	//Notify
+	log.Printf("Player %d'nin Topladigi Toplam Tas : %d", 2, core.CountCollectedStones(stones, 2))
+	log.Printf("Player %d'nin Topladigi Toplam Tas : %d", 1, core.CountCollectedStones(stones, 1))
+
+	if core.IsFinishedForPlayer(stones, 1) {
+		log.Printf("Player %d Kazandi!", 1)
+	} else if core.IsFinishedForPlayer(stones, 2) {
+		log.Printf("Player %d Kazandi!", 2)
+	}
+}
+
+// Butun Tavla Dinamikleri 3. Senaryo ile Test Edilir. Sadece bot yok.
+func TestFullSmilation3(t *testing.T) {
+	//Butun taslar dizildi
+	stones := core.GetInitialStones()
+
+	// 14
+	// Atilan zarlar (her tur için player ayrı ayrı)
+	playerDice := map[int][][]int{
+		//
+		1: {
+			{3, 6},
+			{4, 4},
+			{4, 3},
+			{6, 6},
+			{2, 2},
+			{1, 3},
+			{1, 2},
+			{4, 3},
+			{3, 2},
+			{3, 3},
+			{6, 3},
+			{6, 1},
+			{6, 3},
+			{4, 1},
+			{2, 6},
+			{2, 4},
+			{2, 4},
+			{6, 4},
+			{5, 5},
+		},
+		2: {
+			{3, 5},
+			{3, 3},
+			{4, 6},
+			{3, 3},
+			{4, 3},
+			{3, 4},
+			{1, 2},
+			{1, 5},
+			{5, 6},
+			{3, 1},
+			{2, 1},
+			{4, 6},
+			{5, 5},
+			{1, 1},
+			{5, 2},
+			{1, 5},
+			{3, 4},
+			{6, 1},
+			{3, 1},
+		},
+	}
+
+	// Oynanan Taslar (fromPoint -> toPoint)
+	moves := map[int][][][2]int{
+		//Player 1
+		1: {
+			{{0, 6}, {0, 3}},
+			{{6, 14}, {11, 15}, {11, 15}},
+			{{11, 14}, {16, 20}},
+			{{3, 21}, {16, 22}},
+			{{16, 20}, {11, 13}, {11, 13}},
+			{{18, 21}, {18, 19}},
+			{{19, 22}},
+			{{15, 18}, {15, 19}},
+			{{18, 23}},
+			{{13, 19}, {13, 19}},
+			{{14, 20}, {14, 17}},
+			{{17, 18}, {18, 24}},
+			{{18, 24}, {21, 24}},
+			{{20, 24}, {23, 24}},
+			{{22, 24}, {18, 24}},
+			{{20, 24}, {22, 24}},
+			{{20, 24}, {18, 20}},
+			{{19, 24}, {20, 24}},
+			{{19, 24}, {19, 24}, {21, 24}},
+		},
+		//Player 2
+		2: {
+			{{5, 2}, {7, 2}},
+			{{23, 17}, {23, 17}},
+			{{12, 2}},
+			{{12, 6}, {12, 6}},
+			{{7, 3}, {6, 3}},
+			{{12, 9}, {12, 8}},
+			{{6, 5}, {7, 5}},
+			{{9, 4}, {5, 4}},
+			{{17, 12}, {17, 11}},
+			{{8, 5}, {12, 11}},
+			{{11, 8}},
+			{{11, 5}, {8, 4}},
+			{{4, 24}, {4, 24}, {5, 0}, {5, 0}},
+			{{5, 4}, {5, 4}, {5, 4}, {2, 1}},
+			{{4, 24}, {1, 24}},
+			{{4, 24}, {5, 4}},
+			{{2, 24}, {3, 24}},
+			{{5, 24}, {4, 3}},
+			{},
 		},
 	}
 

@@ -946,6 +946,33 @@ func GetPossibleMovePoints(
 
 	resultSet := make(map[int]bool)
 
+	//Kirik Tasi var ve baska tasi oynamak istiyor..Izin verilmez..
+	isPlayerMustEnterFromBar := PlayerMustEnterFromBar(stones, player)
+	if isPlayerMustEnterFromBar && fromPointIndex != -1 {
+		return nil // bar'dan inmediği sürece başka taş oynayamaz
+	} else if isPlayerMustEnterFromBar && fromPointIndex == -1 { //Kirik tasi sokmasi durumunda girilebilecek PointIndexleri Gosterir..
+		barResult := IsAnyBarEntryAllowed(stones, player, dice) //1-) barResult.EnterableDice kullanilabilecek zarlari ifade eder.
+		if !barResult.Allowed {
+			return nil
+		}
+		for _, die := range barResult.EnterableDice {
+			entryPoint := GetEntryPoint(player, die)
+			resultSet[entryPoint] = true
+		}
+
+		//Eger kirik tas girilmeye calisiliyor ise diger kosullara bakilmasina gerek yok..
+		// Set → slice
+		return mapKeysToSortedSlice(resultSet)
+
+		/*	var possiblePoints []int
+			for p := range resultSet {
+				possiblePoints = append(possiblePoints, p)
+			}
+
+			sort.Ints(possiblePoints)
+			return possiblePoints*/
+	}
+
 	if !playerHasTopStoneAt(stones, player, fromPointIndex) {
 		return nil
 	}
@@ -1008,6 +1035,33 @@ func GetPossibleMovePoints(
 		}
 	}
 
+	// Double zar: 3 adım. 1'i kullanilmis. (d, d, d) 1'den 3 adıma kadar
+	if len(dice) == 3 && dice[0] == dice[1] {
+		d := dice[0]
+		for steps := 1; steps <= 3; steps++ {
+			sum := d * steps
+			valid := true
+			//1, 2 ve 3 adimlik tum kademeler denenir.
+			for i := 1; i < steps; i++ {
+				intermediate := fromPointIndex + direction*d*i
+				if intermediate < 0 || intermediate >= 24 || !canMoveToPoint(stones, player, intermediate) {
+					valid = false
+					break
+				}
+			}
+			target := fromPointIndex + direction*sum
+			if valid {
+				if target >= 0 && target < 24 && canMoveToPoint(stones, player, target) {
+					resultSet[target] = true
+				} else if isBearOffTarget(target) {
+					if allowed, _, _ := CanBearOffStone(stones, player, fromPointIndex, dice[:steps]); allowed {
+						resultSet[24] = true
+					}
+				}
+			}
+		}
+	}
+
 	// Double zar: 4 adım (d, d, d, d) 1'den 4 adıma kadar
 	if len(dice) == 4 && dice[0] == dice[1] {
 		d := dice[0]
@@ -1059,13 +1113,24 @@ func GetPossibleMovePoints(
 	}*/
 
 	// Set → slice
-	var possiblePoints []int
+	return mapKeysToSortedSlice(resultSet)
+
+	/*var possiblePoints []int
 	for p := range resultSet {
 		possiblePoints = append(possiblePoints, p)
 	}
 
 	sort.Ints(possiblePoints)
-	return possiblePoints
+	return possiblePoints*/
+}
+
+func mapKeysToSortedSlice(m map[int]bool) []int {
+	var result []int
+	for k := range m {
+		result = append(result, k)
+	}
+	sort.Ints(result)
+	return result
 }
 
 // Oyuncuya gore Tas Toplama PointIndex araliklari belirleniyor.
