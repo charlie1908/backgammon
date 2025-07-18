@@ -1129,6 +1129,82 @@ func TestPlayer1ComplexPossibleMoves2(t *testing.T) {
 	}
 }
 
+func TestPlayer2PossibleMovesForDoubleBarDice(t *testing.T) {
+	player1 := 1
+	player2 := 2
+
+	var stones []*core.LogicalCoordinate
+
+	//Player 2
+	stones = append(stones, &core.LogicalCoordinate{PointIndex: -1, Player: player2, IsTop: true, PositionType: core.PositionTypeEnum.Bar})
+	stones = append(stones, &core.LogicalCoordinate{PointIndex: 16, Player: player2, IsTop: true, PositionType: core.PositionTypeEnum.Point})
+
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 20, Player: player2, IsTop: i == 1})
+	}
+
+	// Player 1 taşları
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 23, Player: player1, IsTop: i == 1})
+	}
+	for i := 0; i < 3; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 18, Player: player1, IsTop: i == 2})
+	}
+
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 15, Player: player1, IsTop: i == 1})
+	}
+
+	stones = append(stones, &core.LogicalCoordinate{PointIndex: 12, Player: player1, IsTop: true, PositionType: core.PositionTypeEnum.Point})
+	/*	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 12, Player: player1, IsTop: i == 1})
+	}*/
+
+	dice := core.ExpandDice([]int{4, 4})
+
+	// Player 1 için 0 noktasından hareketler
+	possibleFromBar := core.GetPossibleMovePoints(stones, player2, -1, dice)
+	t.Logf("Player 2 taşları 0 noktasından gidebileceği noktalar: %v", possibleFromBar)
+
+	expected := []int{20}
+	if !reflect.DeepEqual(possibleFromBar, expected) {
+		t.Fatalf("PointIndex 20 olmasi gerekir!")
+	}
+
+	// Player 2 için 4 noktasından hareketler
+	possibleFromBar1 := core.GetPossibleMovePoints(stones, player2, 4, dice)
+	t.Logf("Player 2 taşları  noktasından gidebileceği noktalar: %v", possibleFromBar1)
+
+	if len(possibleFromBar1) != 0 {
+		t.Fatalf("PointIndex hic olmamasi gerekir!")
+	}
+
+	//Kirik tasi girdik
+	newStones, ok, usedDice, remainingDice, _ := core.TryMoveStone(stones, player2, -1, possibleFromBar[0], dice)
+	if !ok {
+		t.Fatalf("Kirik Player 2 icin girilebilmeli idi!")
+	}
+	t.Logf("Başarılı kirik zar girildi. Kullanılan zarlar: %v, Kalan zarlar: %v", usedDice, remainingDice)
+	possibleFromBar2 := core.GetPossibleMovePoints(newStones, player2, possibleFromBar[0], remainingDice)
+	t.Logf("Player 2 taşları  noktasından gidebileceği noktalar: %v", possibleFromBar2)
+
+	expected2 := []int{8, 12, 16}
+	if !reflect.DeepEqual(possibleFromBar2, expected2) {
+		t.Fatalf("PointIndex 8,12,16 olmasi gerekir!")
+	}
+
+	_, ok2, usedDice2, remainingDice2, broken := core.TryMoveStone(newStones, player2, possibleFromBar[0], possibleFromBar2[0], remainingDice)
+	if !ok2 {
+		t.Fatalf("Player 2 %v 'ye giebilmeli idi!", possibleFromBar2[0])
+	}
+
+	t.Logf("Başarılı Player 2 %v noktasina gitti. Kullanılan zarlar: %v, Kalan zarlar: %v", possibleFromBar2[0], usedDice2, remainingDice2)
+
+	if len(broken) > 0 {
+		log.Printf("Player %d kırdı: PointIndex=%d, Player=%d", player2, broken[0].PointIndex, broken[0].Player)
+	}
+}
+
 func TestPlayer1BearOffMoves(t *testing.T) {
 	player1 := 1
 
