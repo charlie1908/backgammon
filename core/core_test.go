@@ -1129,7 +1129,72 @@ func TestPlayer1ComplexPossibleMoves2(t *testing.T) {
 	}
 }
 
-func TestPlayer2PossibleMovesForDoubleBarDice(t *testing.T) {
+func TestPlayer3PossibleMovesForDoubleDiceFor2(t *testing.T) {
+	player1 := 1
+	player2 := 2
+
+	var stones []*core.LogicalCoordinate
+
+	//Player 2
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 20, Player: player2, IsTop: i == 1})
+	}
+
+	// Player 1 taşları
+	stones = append(stones, &core.LogicalCoordinate{PointIndex: 16, Player: player1, IsTop: true, PositionType: core.PositionTypeEnum.Point})
+
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 23, Player: player1, IsTop: i == 1})
+	}
+	for i := 0; i < 3; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 18, Player: player1, IsTop: i == 2})
+	}
+
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 15, Player: player1, IsTop: i == 1})
+	}
+
+	stones = append(stones, &core.LogicalCoordinate{PointIndex: 13, Player: player1, IsTop: true, PositionType: core.PositionTypeEnum.Point})
+	/*for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 13, Player: player1, IsTop: i == 1})
+	}*/
+
+	dice := core.ExpandDice([]int{4, 3})
+
+	possibleFromBar := core.GetPossibleMovePoints(stones, player2, 20, dice)
+	t.Logf("Player 2 taşları  noktasından gidebileceği noktalar: %v", possibleFromBar)
+
+	expected := []int{13, 16, 17}
+
+	if !reflect.DeepEqual(possibleFromBar, expected) {
+		t.Fatalf("PointIndex 13,16,17 olmasi gerekir!")
+	}
+
+	_, ok2, usedDice2, remainingDice2, broken := core.TryMoveStone(stones, player2, 20, possibleFromBar[0], dice)
+	if !ok2 {
+		t.Fatalf("Player 2 %v 'ye giebilmeli idi!", possibleFromBar[0])
+	}
+
+	t.Logf("Başarılı Player 2 %v noktasina gitti. Kullanılan zarlar: %v, Kalan zarlar: %v", possibleFromBar[0], usedDice2, remainingDice2)
+
+	/*if len(broken) > 0 {
+		log.Printf("Player %d kırdı: PointIndex=%d, Player=%d", player2, broken[0].PointIndex, broken[0].Player)
+	}*/
+
+	expectedBroken := []int{16, 13}
+	var brokenReal []int
+
+	for _, b := range broken {
+		brokenReal = append(brokenReal, b.PointIndex)
+		log.Printf("Player %d kırdı: PointIndex=%d, Player=%d", player2, b.PointIndex, b.Player)
+	}
+
+	if !reflect.DeepEqual(brokenReal, expectedBroken) {
+		t.Fatalf("Player 1 icin PointIndex 13 ve 16 taslarinin kirilmasi gerekir!")
+	}
+}
+
+func TestPlayer3PossibleMovesForDoubleBarDiceFor3(t *testing.T) {
 	player1 := 1
 	player2 := 2
 
@@ -1156,6 +1221,7 @@ func TestPlayer2PossibleMovesForDoubleBarDice(t *testing.T) {
 	}
 
 	stones = append(stones, &core.LogicalCoordinate{PointIndex: 12, Player: player1, IsTop: true, PositionType: core.PositionTypeEnum.Point})
+	stones = append(stones, &core.LogicalCoordinate{PointIndex: 8, Player: player1, IsTop: true, PositionType: core.PositionTypeEnum.Point})
 	/*	for i := 0; i < 2; i++ {
 		stones = append(stones, &core.LogicalCoordinate{PointIndex: 12, Player: player1, IsTop: i == 1})
 	}*/
@@ -1200,8 +1266,148 @@ func TestPlayer2PossibleMovesForDoubleBarDice(t *testing.T) {
 
 	t.Logf("Başarılı Player 2 %v noktasina gitti. Kullanılan zarlar: %v, Kalan zarlar: %v", possibleFromBar2[0], usedDice2, remainingDice2)
 
-	if len(broken) > 0 {
+	/*if len(broken) > 0 {
 		log.Printf("Player %d kırdı: PointIndex=%d, Player=%d", player2, broken[0].PointIndex, broken[0].Player)
+	}*/
+
+	expectedBroken := []int{12, 8}
+	var brokenReal []int
+
+	for _, b := range broken {
+		brokenReal = append(brokenReal, b.PointIndex)
+		log.Printf("Player %d kırdı: PointIndex=%d, Player=%d", player2, b.PointIndex, b.Player)
+	}
+
+	if !reflect.DeepEqual(brokenReal, expectedBroken) {
+		t.Fatalf("Player 1 icin PointIndex 12,8 taslarinin kirilmasi gerekir!")
+	}
+}
+
+func TestPlayer4PossibleMovesForDoubleDiceFor4(t *testing.T) {
+	player1 := 1
+	player2 := 2
+
+	var stones []*core.LogicalCoordinate
+
+	//Player 2
+	stones = append(stones, &core.LogicalCoordinate{PointIndex: 16, Player: player2, IsTop: true, PositionType: core.PositionTypeEnum.Point})
+
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 20, Player: player2, IsTop: i == 1})
+	}
+
+	// Player 1 taşları
+	for i := 0; i < 3; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 18, Player: player1, IsTop: i == 2})
+	}
+
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 15, Player: player1, IsTop: i == 1})
+	}
+
+	stones = append(stones, &core.LogicalCoordinate{PointIndex: 12, Player: player1, IsTop: true, PositionType: core.PositionTypeEnum.Point})
+	stones = append(stones, &core.LogicalCoordinate{PointIndex: 8, Player: player1, IsTop: true, PositionType: core.PositionTypeEnum.Point})
+	stones = append(stones, &core.LogicalCoordinate{PointIndex: 4, Player: player1, IsTop: true, PositionType: core.PositionTypeEnum.Point})
+
+	dice := core.ExpandDice([]int{4, 4})
+
+	// Player 2 için 4 noktasından hareketler
+	possibleFromBar := core.GetPossibleMovePoints(stones, player2, 20, dice)
+	t.Logf("Player 2 taşları  noktasından gidebileceği noktalar: %v", possibleFromBar)
+
+	expected := []int{4, 8, 12, 16}
+	if !reflect.DeepEqual(possibleFromBar, expected) {
+		t.Fatalf("PointIndex 4,8,12,16 olmasi gerekir!")
+	}
+
+	//4 Zar'da => 4zar ile hedefe ulasma
+	//_, ok, usedDice, remainingDice, broken := core.TryMoveStone(stones, player2, 20, possibleFromBar[0], dice)
+
+	//4 Zar'da => 3zar ile hedefe ulasma
+	_, ok, usedDice, remainingDice, broken := core.TryMoveStone(stones, player2, 20, 8, dice)
+	if !ok {
+		t.Fatalf("Player 2 %v 'ye giebilmeli idi!", possibleFromBar[0])
+	}
+
+	//t.Logf("Başarılı Player 2 %v noktasina gitti. Kullanılan zarlar: %v, Kalan zarlar: %v", possibleFromBar[0], usedDice, remainingDice)
+	t.Logf("Başarılı Player 2 %v noktasina gitti. Kullanılan zarlar: %v, Kalan zarlar: %v", 8, usedDice, remainingDice)
+
+	/*if len(broken) > 0 {
+		log.Printf("Player %d kırdı: PointIndex=%d, Player=%d", player2, broken[0].PointIndex, broken[0].Player)
+	}*/
+
+	//expectedBroken := []int{12, 8, 4}
+	expectedBroken := []int{12, 8}
+	var brokenReal []int
+
+	for _, b := range broken {
+		brokenReal = append(brokenReal, b.PointIndex)
+		log.Printf("Player %d kırdı: PointIndex=%d, Player=%d", player2, b.PointIndex, b.Player)
+	}
+
+	if !reflect.DeepEqual(brokenReal, expectedBroken) {
+		t.Fatalf("Player 1 icin PointIndex 12,8 taslarinin kirilmasi gerekir!")
+	}
+}
+
+func TestPlayer1PossibleMovesForDoubleDiceFor4To1PointIndex(t *testing.T) {
+	player1 := 1
+	player2 := 2
+
+	var stones []*core.LogicalCoordinate
+
+	//Player 2
+
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 20, Player: player2, IsTop: i == 1})
+	}
+
+	// Player 1 taşları
+	stones = append(stones, &core.LogicalCoordinate{PointIndex: 16, Player: player1, IsTop: true, PositionType: core.PositionTypeEnum.Point})
+	for i := 0; i < 3; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 18, Player: player1, IsTop: i == 2})
+	}
+
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 15, Player: player1, IsTop: i == 1})
+	}
+
+	for i := 0; i < 2; i++ {
+		stones = append(stones, &core.LogicalCoordinate{PointIndex: 12, Player: player1, IsTop: i == 1})
+	}
+
+	stones = append(stones, &core.LogicalCoordinate{PointIndex: 8, Player: player1, IsTop: true, PositionType: core.PositionTypeEnum.Point})
+	stones = append(stones, &core.LogicalCoordinate{PointIndex: 4, Player: player1, IsTop: true, PositionType: core.PositionTypeEnum.Point})
+
+	dice := core.ExpandDice([]int{4, 4})
+
+	// Player 2 için 4 noktasından hareketler
+	possibleFromBar := core.GetPossibleMovePoints(stones, player2, 20, dice)
+	t.Logf("Player 2 taşları  noktasından gidebileceği noktalar: %v", possibleFromBar)
+
+	expected := []int{16}
+	if !reflect.DeepEqual(possibleFromBar, expected) {
+		t.Fatalf("PointIndex 16 olmasi gerekir!")
+	}
+
+	//4 Zar'da => 4zar ile hedefe ulasma
+	//_, ok, usedDice, remainingDice, broken := core.TryMoveStone(stones, player2, 20, possibleFromBar[0], dice)
+
+	//4 Zar'da => 3zar ile hedefe ulasma
+	_, ok, usedDice, remainingDice, broken := core.TryMoveStone(stones, player2, 20, 8, dice)
+	if ok {
+		t.Fatalf("Player 2 %v 'ye gidememesi gerekiyordu!", possibleFromBar[0])
+	}
+
+	//t.Logf("Başarılı Player 2 %v noktasina gitti. Kullanılan zarlar: %v, Kalan zarlar: %v", possibleFromBar[0], usedDice, remainingDice)
+	t.Logf("Player 2 %v noktasina gidememistir. Kullanılan zarlar: %v, Kalan zarlar: %v", 4, usedDice, remainingDice)
+
+	/*if len(broken) > 0 {
+		log.Printf("Player %d kırdı: PointIndex=%d, Player=%d", player2, broken[0].PointIndex, broken[0].Player)
+	}*/
+
+	if len(broken) > 0 {
+		t.Fatalf("Player 1 icin hicbir tasin kirilmamasi gerekir!")
 	}
 }
 

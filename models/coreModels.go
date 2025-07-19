@@ -11,4 +11,5 @@ type MoveCheckResult struct {
 	NormalDice      []int // Zar mesafasi ile uyum kontrolu..
 	RemainingDice   []int // Bu hamleden sonra kalacak zarlar
 	UsedDice        []int // Bu hamlede kullanılan zarlar
+	BrokenPoints    []int // 🔥 Arada kırılan rakip taşlar (willBreak == true olanlar) 1-) canMoveToPoint() => 2-) IsNormalMoveAllowed() = > 3-) TryMoveStone()
 }
