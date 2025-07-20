@@ -2543,3 +2543,179 @@ func TestFullSmilation3(t *testing.T) {
 		log.Printf("Player %d Kazandi!", 2)
 	}
 }
+
+// Butun Tavla Dinamikleri 4. Senaryo ile Test Edilir. Sadece bot yok.
+func TestFullSmilation4(t *testing.T) {
+	//Butun taslar dizildi
+	stones := core.GetInitialStones()
+
+	// 9
+	// Atilan zarlar (her tur için player ayrı ayrı)
+	playerDice := map[int][][]int{
+		//
+		1: {
+			{3, 3},
+			{2, 6},
+			{6, 2},
+			{1, 3},
+			{6, 1},
+			{1, 4},
+			{3, 2},
+			{6, 1},
+			{2, 1},
+			{2, 5},
+			{5, 4},
+			{5, 5},
+			{1, 5},
+			{2, 2},
+			{2, 3},
+			{5, 6},
+			{1, 1}, //--------------------
+			{2, 5},
+			{4, 1},
+			{3, 2},
+			{6, 5},
+			{4, 2},
+		},
+		2: {
+			{1, 4},
+			{6, 5},
+			{6, 3},
+			{5, 4},
+			{2, 1},
+			{6, 1},
+			{2, 4},
+			{4, 3},
+			{6, 5},
+			{6, 1},
+			{3, 4},
+			{1, 5},
+			{5, 5},
+			{5, 6},
+			{4, 1},
+			{2, 6},
+			{1, 6},
+			{2, 5},
+			{5, 4},
+			{4, 6},
+			{4, 3},
+			{3, 3},
+		},
+	}
+
+	// Oynanan Taslar (fromPoint -> toPoint)
+	moves := map[int][][][2]int{
+		//Player 1
+		1: {
+			{{0, 6}, {0, 6}},
+			{{11, 19}},
+			{{11, 19}},
+			{{11, 15}}, //Player 2 Pointindex 14 kirildi.
+			{{-1, 0}, {0, 6}},
+			{{16, 20}, {18, 19}},
+			{{18, 20}, {18, 21}},
+			{{16, 22}, {21, 22}}, //{{6, 13}},
+			{{16, 18}, {19, 20}},
+			{{6, 11}, {20, 22}},
+			{{11, 20}},
+			{{6, 16}, {6, 16}},
+			{{18, 23}, {22, 23}},
+			{{16, 18}, {16, 18}, {11, 13}, {11, 13}},
+			{{13, 18}},
+			{{13, 18}, {18, 24}},
+			{{23, 24}, {23, 24}, {22, 23}, {23, 24}}, //{{23, 24}, {23, 24}, {22, 24}}, Once oynayacak sonra toplayacak..Dogrudan olursa isler karisiyor..
+			{{19, 24}, {22, 24}},
+			{{20, 24}, {20, 21}},
+			{{21, 24}, {18, 20}},
+			{{18, 24}, {19, 24}},
+			{{20, 24}, {18, 20}},
+		},
+		//Player 2
+		2: {
+			{{12, 7}},
+			{{23, 12}},
+			{{23, 14}},
+			{{-1, 20}, {20, 15}}, //Player 1 PointIndex 15 krildi
+			{{15, 12}},
+			{{7, 0}},
+			{{5, 3}, {7, 3}},
+			{{12, 5}},
+			{{12, 1}},
+			{{7, 0}},
+			{{7, 3}, {5, 2}},
+			{{12, 6}},
+			{{12, 7}, {12, 7}, {12, 7}, {7, 2}},
+			{{7, 1}, {7, 2}},
+			{{6, 2}, {0, 24}},
+			{{5, 24}, {1, 24}},
+			{{5, 24}, {0, 24}},
+			{{1, 24}, {5, 0}},
+			{{3, 24}, {5, 0}},
+			{{3, 24}, {3, 24}},
+			{{2, 24}, {2, 24}},
+			{{2, 24}, {2, 24}, {0, 24}, {0, 24}},
+		},
+	}
+
+	for turn := 0; turn < len(playerDice[1]); turn++ {
+		for player := 1; player <= 2; player++ {
+			turnMoves := moves[player][turn]
+			dice := core.ExpandDice(playerDice[player][turn])
+
+			t.Logf("===== Turn %d | Player %d | Zarlar: %v =====", turn+1, player, dice)
+
+			for moveIndex, move := range turnMoves {
+				if len(dice) == 0 {
+					t.Logf("Player %d için zar kalmadı, hamle durduruluyor", player)
+					break
+				}
+
+				fromPoint := move[0]
+				toPoint := move[1]
+
+				// Kirik taş varsa, otomatik bar'dan gir
+				if core.PlayerMustEnterFromBar(stones, player) {
+					fromPoint = -1
+				}
+
+				t.Logf("Move %d.%d: %d -> %d, Dice: %v", turn+1, moveIndex+1, fromPoint, toPoint, dice)
+
+				newStones, ok, usedDice, remainingDice, broken := core.TryMoveStone(stones, player, fromPoint, toPoint, dice)
+				if !ok {
+					t.Errorf("Player %d hamlesi başarısız oldu: %d -> %d", player, fromPoint, toPoint)
+					break // başarısızsa durdurabiliriz, ya da continue
+				}
+
+				if len(broken) > 0 {
+					log.Printf("Player %d kırdı: PointIndex=%d, Player=%d", player, broken[0].PointIndex, broken[0].Player)
+				}
+
+				stones = newStones
+				dice = remainingDice
+
+				t.Logf("Başarılı hareket. Kullanılan zarlar: %v, Kalan zarlar: %v", usedDice, remainingDice)
+
+				/*core.SortStonesByPlayerPointAndStackDesc(stones)
+
+				t.Log("Taşların güncel durumu:")
+				for _, stone := range stones {
+					t.Logf("PointIndex: %2d, Player: %d, StackIndex: %d, IsTop: %v, MoveOrder: %d",
+						stone.PointIndex, stone.Player, stone.StackIndex, stone.IsTop, stone.MoveOrder)
+				}*/
+			}
+
+			if len(turnMoves) == 0 && core.PlayerMustEnterFromBar(stones, player) {
+				log.Printf("Player %d kirik tasi var ve gele geldi!", player)
+			}
+		}
+	}
+	//Notify
+	log.Printf("Player %d'nin Topladigi Toplam Tas : %d", 2, core.CountCollectedStones(stones, 2))
+	log.Printf("Player %d'nin Topladigi Toplam Tas : %d", 1, core.CountCollectedStones(stones, 1))
+
+	if core.IsFinishedForPlayer(stones, 1) {
+		log.Printf("Player %d Kazandi!", 1)
+	} else if core.IsFinishedForPlayer(stones, 2) {
+		log.Printf("Player %d Kazandi!", 2)
+	}
+}
